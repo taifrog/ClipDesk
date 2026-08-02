@@ -1,0 +1,21 @@
+{
+  "name": "clipdesk-addon-chrome",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ClipDesk 用 Chrome/Comet ブラウザ拡張機能",
+  "scripts": {
+    "dev": "vite build --mode development --watch",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "typescript": "~5.4.5",
+    "vite": "^5.2.0"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}
