@@ -22,6 +22,54 @@ npm run dev
 - `npm run preview` — ビルド結果をプレビュー
 - `npm run lint` — oxlint で構文チェック
 
+## 拡張機能を使うための準備（Webサイト + 拡張機能）
+
+拡張機能から ClipDesk サイトへ投稿するには、まず Web サイトを起動しておく必要があります。
+
+### 1. ClipDesk サイトを起動する
+
+```bash
+cd c:/data/Github/ClipDesk
+npm install
+npm run dev
+```
+
+デフォルトでは `http://localhost:5173/` でサイトが起動します。
+
+### 2. 拡張機能をビルドする
+
+別のターミナルで実行してください。
+
+```bash
+cd c:/data/Github/ClipDesk/addon-chrome
+npm install
+npm run build
+```
+
+ビルド後、`addon-chrome/dist/` に読み込み可能な拡張機能が生成されます。
+
+### 3. ブラウザに拡張機能を読み込む
+
+1. Comet または Chrome で `chrome://extensions/` を開く
+2. 「デベロッパー モード」を有効化
+3. 「パッケージ化されていない拡張機能を読み込む」で `addon-chrome/dist` を選択
+
+### 4. 拡張機能のオプションを設定する
+
+拡張機能アイコンを右クリック →「オプション」から、以下を設定してください。
+
+- **OpenCode Go API キー**
+- **投稿先 URL**: `http://localhost:5173/api/clip`（実際のエンドポイントに応じて変更）
+- **使用モデル**: 例 `gpt-4o-mini`
+- **要約の言語**: 例 `ja`
+
+### 5. 投稿する
+
+1. 要約したいページを開く
+2. 拡張機能アイコンをクリック
+3. 「要約して投稿」ボタンを押す
+4. ClipDesk サイトに要約結果が投稿される
+
 ## ブラウザ拡張機能（addon-chrome）
 
 `addon-chrome/` には、Chromium ベースの Comet ブラウザ向け拡張機能があります。
