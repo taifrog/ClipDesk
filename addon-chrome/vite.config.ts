@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync } from 'fs';
 
 // ビルド後に dist 直下に必要なファイルを整備するプラグイン
 function postBuildPlugin() {
@@ -28,6 +28,16 @@ function postBuildPlugin() {
 
       // manifest.json を dist 直下にコピーする
       copyFileSync(resolve(src, 'manifest.json'), resolve(dist, 'manifest.json'));
+
+      // アイコン画像を dist/icons にコピーする
+      const iconsSrcDir = resolve(src, 'icons');
+      const iconsDistDir = resolve(dist, 'icons');
+      mkdirSync(iconsDistDir, { recursive: true });
+      for (const file of readdirSync(iconsSrcDir)) {
+        if (file.endsWith('.png')) {
+          copyFileSync(resolve(iconsSrcDir, file), resolve(iconsDistDir, file));
+        }
+      }
     },
   };
 }

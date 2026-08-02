@@ -6,11 +6,13 @@
   "description": "ClipDesk 用 Chrome/Comet ブラウザ拡張機能",
   "scripts": {
     "dev": "vite build --mode development --watch",
-    "build": "tsc && vite build",
+    "generate-icons": "node scripts/generate-icons.mjs",
+    "build": "npm run generate-icons && tsc && vite build",
     "preview": "vite preview"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.268",
+    "sharp": "^0.35.3",
     "typescript": "~5.4.5",
     "vite": "^5.2.0"
   },
