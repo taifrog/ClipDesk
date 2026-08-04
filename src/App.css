@@ -161,6 +161,63 @@
   }
 }
 
+#clips {
+  padding: 32px;
+  border-top: 1px solid var(--border);
+  text-align: left;
+
+  h2 {
+    margin-bottom: 12px;
+  }
+
+  button {
+    font-size: 14px;
+    padding: 6px 12px;
+    margin-bottom: 16px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  .clip-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .clip-item {
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--accent-bg);
+  }
+
+  .clip-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+  }
+
+  .clip-meta {
+    font-size: 12px;
+    color: var(--text);
+    opacity: 0.7;
+    margin-bottom: 8px;
+  }
+
+  .clip-summary {
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+}
+
 .ticks {
   position: relative;
   width: 100%;

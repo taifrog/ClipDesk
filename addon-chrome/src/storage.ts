@@ -5,7 +5,8 @@ import type { ExtensionSettings } from './types';
 // 設定のデフォルト値
 const DEFAULT_SETTINGS: ExtensionSettings = {
   apiKey: '',
-  localSiteUrl: 'http://localhost:5173/api/clips',
+  // テスト用簡易APIサーバーへの投稿先
+  localSiteUrl: 'http://localhost:3001/api/clip',
   model: 'gpt-4o-mini',
   language: 'ja',
 };
