@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Category, Clip } from '../types'
 
 // Sidebar コンポーネントのプロパティ
@@ -10,6 +11,8 @@ interface SidebarProps {
   onSelectCategory: (categoryId: string) => void
   onDropToCategory: (categoryId: string) => void
   onAddCategory: () => void
+  onRenameCategory?: (categoryId: string) => void
+  onDeleteCategory?: (categoryId: string) => void
 }
 
 // アイコン名から SVG アイコン要素を生成する
@@ -45,6 +48,50 @@ function Icon({ name }: { name: string }) {
   )
 }
 
+// 右クリックで表示するカテゴリ操作メニューコンポーネント
+// all / others は操作対象外とする
+function CategoryContextMenu({
+  category,
+  onRename,
+  onDelete,
+}: {
+  category: Category
+  onRename?: (categoryId: string) => void
+  onDelete?: (categoryId: string) => void
+}) {
+  if (category.id === 'all' || category.id === 'others') return null
+  if (!onRename && !onDelete) return null
+
+  return (
+    <ul className="category-context-menu" role="menu">
+      {onRename && (
+        <li role="none">
+          <button
+            type="button"
+            className="category-context-menu-item"
+            role="menuitem"
+            onClick={() => onRename(category.id)}
+          >
+            名前を変更
+          </button>
+        </li>
+      )}
+      {onDelete && (
+        <li role="none">
+          <button
+            type="button"
+            className="category-context-menu-item delete"
+            role="menuitem"
+            onClick={() => onDelete(category.id)}
+          >
+            削除
+          </button>
+        </li>
+      )}
+    </ul>
+  )
+}
+
 // サイドバーコンポーネント
 export function Sidebar({
   categories,
@@ -55,6 +102,8 @@ export function Sidebar({
   onSelectCategory,
   onDropToCategory,
   onAddCategory,
+  onRenameCategory,
+  onDeleteCategory,
 }: SidebarProps) {
   // カテゴリごとのクリップ件数をカウントする
   const getCount = (categoryId: string) => {
@@ -62,11 +111,42 @@ export function Sidebar({
     return clips.filter((clip) => clip.categoryId === categoryId).length
   }
 
+  // 表示中のコンテキストメニュー情報
+  const [contextMenu, setContextMenu] = useState<{
+    categoryId: string
+    x: number
+    y: number
+  } | null>(null)
+
+  // カテゴリアイテムで右クリックしたときの処理
+  const handleContextMenu = (
+    e: React.MouseEvent<HTMLButtonElement>,
+    category: Category,
+  ) => {
+    // all / others や操作ハンドラがない場合はブラウザのデフォルトメニューを表示する
+    if (
+      category.id === 'all' ||
+      category.id === 'others' ||
+      (!onRenameCategory && !onDeleteCategory)
+    ) {
+      return
+    }
+    e.preventDefault()
+    setContextMenu({ categoryId: category.id, x: e.clientX, y: e.clientY })
+  }
+
+  // メニューを閉じる処理
+  const closeContextMenu = () => setContextMenu(null)
+
+  const contextCategory = contextMenu
+    ? categories.find((c) => c.id === contextMenu.categoryId)
+    : undefined
+
   const isTrashActive = selectedCategoryId === 'trash'
   const isTrashDragTarget = draggingClipId !== null
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" onClick={closeContextMenu}>
       {/* ロゴとタイトル */}
       <div className="sidebar-header">
         <svg className="sidebar-logo" viewBox="0 0 24 24" aria-hidden="true">
@@ -96,6 +176,7 @@ export function Sidebar({
                   type="button"
                   className={`category-item ${isActive ? 'active' : ''} ${isDragOverTarget ? 'droppable' : ''}`}
                   onClick={() => onSelectCategory(category.id)}
+                  onContextMenu={(e) => handleContextMenu(e, category)}
                   onDragOver={(e) => {
                     // ドロップを許可する（デフォルトは拒否される）
                     if (category.id !== 'all') {
@@ -153,6 +234,21 @@ export function Sidebar({
         <Icon name="settings" />
         <span>設定</span>
       </button>
+
+      {/* カテゴリ右クリックメニュー */}
+      {contextMenu && contextCategory && (
+        <div
+          className="category-context-menu-wrapper"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <CategoryContextMenu
+            category={contextCategory}
+            onRename={onRenameCategory}
+            onDelete={onDeleteCategory}
+          />
+        </div>
+      )}
     </aside>
   )
 }

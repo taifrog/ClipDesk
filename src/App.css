@@ -180,6 +180,52 @@
   height: 20px;
 }
 
+/* カテゴリ右クリックメニュー */
+.category-context-menu-wrapper {
+  position: fixed;
+  z-index: 1000;
+}
+
+.category-context-menu {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  min-width: 140px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.category-context-menu-item {
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.category-context-menu-item:hover {
+  background: var(--accent-bg);
+  color: var(--text-h);
+}
+
+.category-context-menu-item.delete {
+  color: #ef4444;
+}
+
+.category-context-menu-item.delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
 /* ゴミ箱アイテム */
 .trash-item {
   margin-top: 8px;

@@ -311,6 +311,87 @@ app.post('/api/category', (req, res) => {
   }
 });
 
+// カテゴリーを更新するエンドポイント
+// 名称変更やアイコン変更に使用する
+app.patch('/api/category/:id', (req, res) => {
+  const id = req.params.id;
+  if (!id) {
+    return res.status(400).json({ error: 'id が不正です' });
+  }
+
+  const updates = req.body || {};
+  const allowedFields = ['name', 'icon'];
+  const fields = [];
+  const values = {};
+
+  for (const key of allowedFields) {
+    if (key in updates) {
+      fields.push(`${key} = @${key}`);
+      values[key] = updates[key];
+    }
+  }
+
+  if (fields.length === 0) {
+    return res.status(400).json({ error: '更新する項目がありません' });
+  }
+
+  values.id = id;
+
+  const updateStmt = db.prepare(`
+    UPDATE categories SET ${fields.join(', ')} WHERE id = @id
+  `);
+  const result = updateStmt.run(values);
+
+  if (result.changes === 0) {
+    return res.status(404).json({ error: 'カテゴリーが見つかりません' });
+  }
+
+  const selectStmt = db.prepare(`
+    SELECT id, name, icon, sortOrder FROM categories WHERE id = @id
+  `);
+  const row = selectStmt.get({ id });
+  debugLog('カテゴリー更新', row);
+  res.json({ ok: true, category: row });
+});
+
+// カテゴリーを削除するエンドポイント
+// 削除前に、当該カテゴリーに属するクリップを「その他（others）」に移動する
+app.delete('/api/category/:id', (req, res) => {
+  const id = req.params.id;
+  if (!id) {
+    return res.status(400).json({ error: 'id が不正です' });
+  }
+
+  // 保護対象のカテゴリーは削除できない
+  if (id === 'all' || id === 'others') {
+    return res.status(403).json({ error: 'このカテゴリーは削除できません' });
+  }
+
+  // 対象カテゴリーが存在するか確認する
+  const selectStmt = db.prepare(`
+    SELECT id, name, icon, sortOrder FROM categories WHERE id = @id
+  `);
+  const category = selectStmt.get({ id });
+  if (!category) {
+    return res.status(404).json({ error: 'カテゴリーが見つかりません' });
+  }
+
+  // 関連クリップを others に移動する
+  const moveClipsStmt = db.prepare(`
+    UPDATE clips SET categoryId = 'others' WHERE categoryId = @id
+  `);
+  moveClipsStmt.run({ id });
+
+  // カテゴリーを削除する
+  const deleteStmt = db.prepare(`
+    DELETE FROM categories WHERE id = @id
+  `);
+  deleteStmt.run({ id });
+
+  debugLog('カテゴリー削除', category.name);
+  res.json({ ok: true, id });
+});
+
 // 24時間以上経過したゴミ箱のクリップを物理削除する
 function purgeOldTrashClips() {
   try {

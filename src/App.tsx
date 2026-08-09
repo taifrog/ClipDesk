@@ -278,6 +278,73 @@ function App() {
     }
   }
 
+  // カテゴリ名変更時の処理（簡易的にプロンプト入力）
+  const handleRenameCategory = async (categoryId: string) => {
+    const category = categories.find((c) => c.id === categoryId)
+    if (!category) return
+
+    const newName = window.prompt('カテゴリ名を変更してください', category.name)
+    if (!newName || newName.trim() === '') return
+    const trimmedName = newName.trim()
+    if (trimmedName === category.name) return
+
+    try {
+      const response = await fetch(`/api/category/${categoryId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmedName }),
+      })
+      if (!response.ok) {
+        throw new Error('カテゴリ名の変更に失敗しました')
+      }
+      const data = await response.json()
+      const updatedCategory = normalizeApiCategory(data.category)
+      setCategories((prev) =>
+        prev.map((cat) => (cat.id === categoryId ? updatedCategory : cat)),
+      )
+    } catch (err) {
+      console.error('カテゴリ名変更失敗:', err)
+    }
+  }
+
+  // カテゴリ削除時の処理
+  // 削除前に確認ダイアログを表示し、関連クリップは others に移動される
+  const handleDeleteCategory = async (categoryId: string) => {
+    const category = categories.find((c) => c.id === categoryId)
+    if (!category) return
+
+    if (categoryId === 'all' || categoryId === 'others') return
+
+    const confirmed = window.confirm(
+      `「${category.name}」を削除しますか？\nこのカテゴリに属するクリップは「その他」に移動されます。`,
+    )
+    if (!confirmed) return
+
+    try {
+      const response = await fetch(`/api/category/${categoryId}`, {
+        method: 'DELETE',
+      })
+      if (!response.ok) {
+        throw new Error('カテゴリの削除に失敗しました')
+      }
+      setCategories((prev) => prev.filter((cat) => cat.id !== categoryId))
+      // 関連クリップを others に移動する
+      setClips((prev) =>
+        prev.map((clip) =>
+          clip.categoryId === categoryId
+            ? { ...clip, categoryId: 'others' }
+            : clip,
+        ),
+      )
+      // 選択中のカテゴリが削除された場合は「すべてのクリップ」に戻す
+      if (selectedCategoryId === categoryId) {
+        setSelectedCategoryId('all')
+      }
+    } catch (err) {
+      console.error('カテゴリ削除失敗:', err)
+    }
+  }
+
   // ドラッグ開始時の処理
   const handleDragStart = (clipId: number) => {
     setDraggingClipId(clipId)
@@ -299,6 +366,8 @@ function App() {
         onSelectCategory={handleSelectCategory}
         onDropToCategory={handleDropToCategory}
         onAddCategory={handleAddCategory}
+        onRenameCategory={handleRenameCategory}
+        onDeleteCategory={handleDeleteCategory}
       />
 
       <main className="main-content">
