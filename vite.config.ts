@@ -5,9 +5,9 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    // 拡張機能からの POST をテスト用 API サーバーへプロキシする
+    // API サーバーへプロキシする
     proxy: {
-      '/api/clip': {
+      '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,
       },

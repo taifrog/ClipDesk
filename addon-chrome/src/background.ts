@@ -14,6 +14,12 @@ async function getSettings(): Promise<ExtensionSettings> {
   return await loadSettings();
 }
 
+// content script が注入可能なスキームか判定する
+function isInjectableUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  return /^(https?|file|ftp):/i.test(url);
+}
+
 // アクティブなタブの情報を取得する
 // コンテンツスクリプトにメッセージを送り、タイトル・URL・本文を取得する
 async function getActivePageInfo(): Promise<PageInfo> {
@@ -24,12 +30,23 @@ async function getActivePageInfo(): Promise<PageInfo> {
     throw new Error('アクティブなタブが見つかりません');
   }
 
-  const response = await chrome.tabs.sendMessage(tab.id, { type: 'GET_PAGE_INFO' });
-  if (!response || !response.ok) {
-    throw new Error('ページ情報の取得に失敗しました');
+  if (!isInjectableUrl(tab.url)) {
+    throw new Error('このページではクリップできません（通常のWebページでお試しください）');
   }
 
-  return response.info as PageInfo;
+  try {
+    const response = await chrome.tabs.sendMessage(tab.id, { type: 'GET_PAGE_INFO' });
+    if (!response || !response.ok) {
+      throw new Error('ページ情報の取得に失敗しました');
+    }
+    return response.info as PageInfo;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes('Receiving end does not exist')) {
+      throw new Error('このページではクリップできません（通常のWebページでお試しください）');
+    }
+    throw err;
+  }
 }
 
 // 本文を指定文字数に制限する

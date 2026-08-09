@@ -67,7 +67,7 @@ function Options() {
             value={settings.localSiteUrl}
             onChange={(e) => handleChange('localSiteUrl', e.target.value)}
             style={{ width: '100%', padding: 8, fontSize: 14 }}
-            placeholder="http://localhost:5173/api/clips"
+            placeholder="http://localhost:3001/api/clip"
           />
         </div>
 
