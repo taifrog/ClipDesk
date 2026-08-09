@@ -11,6 +11,8 @@ interface SidebarProps {
   onSelectCategory: (categoryId: string) => void
   onDropToCategory: (categoryId: string) => void
   onAddCategory: () => void
+  onCollectClips: () => void
+  onOpenSettings: () => void
   onRenameCategory?: (categoryId: string) => void
   onDeleteCategory?: (categoryId: string) => void
 }
@@ -102,6 +104,8 @@ export function Sidebar({
   onSelectCategory,
   onDropToCategory,
   onAddCategory,
+  onCollectClips,
+  onOpenSettings,
   onRenameCategory,
   onDeleteCategory,
 }: SidebarProps) {
@@ -155,10 +159,10 @@ export function Sidebar({
         <h1 className="sidebar-title">My Clips</h1>
       </div>
 
-      {/* クリップ追加ボタン */}
-      <button type="button" className="add-clip-button">
+      {/* クリップ収集ボタン */}
+      <button type="button" className="add-clip-button" onClick={onCollectClips}>
         <Icon name="plus" />
-        <span>クリップを追加</span>
+        <span>クリップ収集</span>
       </button>
 
       {/* カテゴリ一覧 */}
@@ -230,7 +234,7 @@ export function Sidebar({
       </button>
 
       {/* 設定 */}
-      <button type="button" className="settings-button">
+      <button type="button" className="settings-button" onClick={onOpenSettings}>
         <Icon name="settings" />
         <span>設定</span>
       </button>

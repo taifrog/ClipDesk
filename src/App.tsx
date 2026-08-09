@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ClipGrid } from './components/ClipGrid'
+import { CollectDialog } from './components/CollectDialog'
 import { Header } from './components/Header'
+import { SettingsDialog } from './components/SettingsDialog'
 import { Sidebar } from './components/Sidebar'
 import { initialCategories, initialClips } from './data/mock'
-import type { Category, Clip } from './types'
+import type { Category, Clip, SourceSite } from './types'
 import './App.css'
 
 // APIから返されるクリップの生データをアプリ内のClip型に正規化する
@@ -16,9 +18,11 @@ function normalizeApiClip(raw: {
   rawBody?: string
   categoryId?: string
   isPinned?: boolean | number
+  isChecked?: boolean | number
   comment?: string
   receivedAt: string
   deletedAt?: string | null
+  checkedAt?: string | null
 }): Clip {
   return {
     id: raw.id,
@@ -28,9 +32,11 @@ function normalizeApiClip(raw: {
     rawBody: raw.rawBody ?? '',
     categoryId: raw.categoryId ?? 'others',
     isPinned: typeof raw.isPinned === 'boolean' ? raw.isPinned : raw.isPinned === 1,
+    isChecked: typeof raw.isChecked === 'boolean' ? raw.isChecked : raw.isChecked === 1,
     comment: raw.comment ?? '',
     receivedAt: raw.receivedAt,
     deletedAt: raw.deletedAt ?? null,
+    checkedAt: raw.checkedAt ?? null,
   }
 }
 
@@ -62,6 +68,26 @@ function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false)
   // 検索クエリ
   const [searchQuery, setSearchQuery] = useState<string>('')
+  // 収集元サイト一覧の状態
+  const [sourceSites, setSourceSites] = useState<SourceSite[]>([])
+  // クリップ収集ダイアログの表示状態
+  const [isCollectDialogOpen, setIsCollectDialogOpen] = useState<boolean>(false)
+  // 設定ダイアログの表示状態
+  const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState<boolean>(false)
+
+  // 収集元サイト一覧を取得する
+  const fetchSourceSites = useCallback(async () => {
+    try {
+      const response = await fetch('/api/source-site')
+      if (!response.ok) {
+        throw new Error(`収集元サイトの取得に失敗しました: ${response.status}`)
+      }
+      const data = await response.json()
+      setSourceSites(data.sites || [])
+    } catch (err) {
+      console.error('収集元サイト取得失敗:', err)
+    }
+  }, [])
 
   // API からカテゴリとクリップを取得する
   const fetchData = useCallback(async (showLoading = false) => {
@@ -93,6 +119,9 @@ function App() {
       const trashData = await trashResponse.json()
       const apiTrashClips: Clip[] = (trashData.clips || []).map(normalizeApiClip)
       setTrashClips(apiTrashClips)
+
+      // 収集元サイトも合わせて取得する
+      await fetchSourceSites()
     } catch (err) {
       console.error('データ取得失敗:', err)
       // 取得失敗時はモックデータのままにせず、空の状態にしてエラーを分かりやすくする
@@ -102,7 +131,7 @@ function App() {
     } finally {
       if (showLoading) setIsLoading(false)
     }
-  }, [])
+  }, [fetchSourceSites])
 
   // 初回表示時にデータを取得する
   useEffect(() => {
@@ -167,7 +196,7 @@ function App() {
 
   // クリップ情報を API 経由で更新する
   // 成功したらローカル状態も同期する
-  const updateClip = async (id: number, updates: Partial<Pick<Clip, 'categoryId' | 'isPinned' | 'comment'>>) => {
+  const updateClip = async (id: number, updates: Partial<Pick<Clip, 'categoryId' | 'isPinned' | 'isChecked' | 'comment'>>) => {
     try {
       const response = await fetch(`/api/clip/${id}`, {
         method: 'PATCH',
@@ -246,6 +275,13 @@ function App() {
     await updateClip(id, { isPinned: !clip.isPinned })
   }
 
+  // 確認済みチェックマーク切り替え時の処理
+  const handleToggleCheck = async (id: number) => {
+    const clip = clips.find((c) => c.id === id)
+    if (!clip) return
+    await updateClip(id, { isChecked: !clip.isChecked })
+  }
+
   // コメント更新時の処理
   const handleUpdateComment = async (id: number, comment: string) => {
     await updateClip(id, { comment })
@@ -307,6 +343,55 @@ function App() {
     }
   }
 
+  // クリップ収集ボタン押下時の処理
+  const handleOpenCollectDialog = () => {
+    setIsCollectDialogOpen(true)
+  }
+
+  // クリップ収集実行時の処理
+  const handleCollectClips = async (params: { tag?: string; keyword?: string; count: number }) => {
+    const response = await fetch('/api/collect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    })
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      throw new Error(data.error || 'クリップの収集に失敗しました')
+    }
+    // 収集後は一覧を更新する
+    await fetchData(false)
+  }
+
+  // 設定ボタン押下時の処理
+  const handleOpenSettings = () => {
+    setIsSettingsDialogOpen(true)
+  }
+
+  // 収集元サイト追加時の処理
+  const handleAddSourceSite = async (site: { tag: string; siteUrl: string }) => {
+    const response = await fetch('/api/source-site', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(site),
+    })
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      throw new Error(data.error || 'サイトの追加に失敗しました')
+    }
+    await fetchSourceSites()
+  }
+
+  // 収集元サイト削除時の処理
+  const handleDeleteSourceSite = async (id: number) => {
+    const response = await fetch(`/api/source-site/${id}`, { method: 'DELETE' })
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      throw new Error(data.error || 'サイトの削除に失敗しました')
+    }
+    setSourceSites((prev) => prev.filter((site) => site.id !== id))
+  }
+
   // カテゴリ削除時の処理
   // 削除前に確認ダイアログを表示し、関連クリップは others に移動される
   const handleDeleteCategory = async (categoryId: string) => {
@@ -366,8 +451,25 @@ function App() {
         onSelectCategory={handleSelectCategory}
         onDropToCategory={handleDropToCategory}
         onAddCategory={handleAddCategory}
+        onCollectClips={handleOpenCollectDialog}
+        onOpenSettings={handleOpenSettings}
         onRenameCategory={handleRenameCategory}
         onDeleteCategory={handleDeleteCategory}
+      />
+
+      <CollectDialog
+        isOpen={isCollectDialogOpen}
+        sourceSites={sourceSites}
+        onClose={() => setIsCollectDialogOpen(false)}
+        onCollect={handleCollectClips}
+      />
+
+      <SettingsDialog
+        isOpen={isSettingsDialogOpen}
+        sourceSites={sourceSites}
+        onClose={() => setIsSettingsDialogOpen(false)}
+        onAddSourceSite={handleAddSourceSite}
+        onDeleteSourceSite={handleDeleteSourceSite}
       />
 
       <main className="main-content">
@@ -396,6 +498,7 @@ function App() {
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
                 onTogglePin={handleTogglePin}
+                onToggleCheck={handleToggleCheck}
                 onUpdateComment={handleUpdateComment}
               />
               <ClipGrid
@@ -406,6 +509,7 @@ function App() {
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
                 onTogglePin={handleTogglePin}
+                onToggleCheck={handleToggleCheck}
                 onUpdateComment={handleUpdateComment}
                 onRestore={handleRestoreClip}
               />

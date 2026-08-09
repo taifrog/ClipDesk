@@ -28,6 +28,7 @@ export const initialClips: Clip[] = [
     receivedAt: '2024-01-15T10:30:00.000Z',
     categoryId: 'design',
     isPinned: true,
+    isChecked: false,
     comment: '',
   },
   {
@@ -39,6 +40,7 @@ export const initialClips: Clip[] = [
     receivedAt: '2024-01-14T09:15:00.000Z',
     categoryId: 'technology',
     isPinned: true,
+    isChecked: false,
     comment: '',
   },
   {
@@ -50,6 +52,7 @@ export const initialClips: Clip[] = [
     receivedAt: '2024-01-13T16:45:00.000Z',
     categoryId: 'marketing',
     isPinned: false,
+    isChecked: false,
     comment: '',
   },
   {
@@ -61,6 +64,7 @@ export const initialClips: Clip[] = [
     receivedAt: '2024-01-12T11:20:00.000Z',
     categoryId: 'lifestyle',
     isPinned: false,
+    isChecked: false,
     comment: '',
   },
   {
@@ -72,6 +76,7 @@ export const initialClips: Clip[] = [
     receivedAt: '2024-01-11T14:00:00.000Z',
     categoryId: 'business',
     isPinned: false,
+    isChecked: false,
     comment: '',
   },
   {
@@ -83,6 +88,7 @@ export const initialClips: Clip[] = [
     receivedAt: '2024-01-10T08:50:00.000Z',
     categoryId: 'education',
     isPinned: false,
+    isChecked: false,
     comment: '',
   },
   {
@@ -94,6 +100,7 @@ export const initialClips: Clip[] = [
     receivedAt: '2024-01-09T17:30:00.000Z',
     categoryId: 'news',
     isPinned: false,
+    isChecked: false,
     comment: '',
   },
   {
@@ -105,6 +112,7 @@ export const initialClips: Clip[] = [
     receivedAt: '2024-01-08T12:10:00.000Z',
     categoryId: 'lifestyle',
     isPinned: false,
+    isChecked: false,
     comment: '',
   },
   {
@@ -116,6 +124,7 @@ export const initialClips: Clip[] = [
     receivedAt: '2024-01-07T10:00:00.000Z',
     categoryId: 'design',
     isPinned: false,
+    isChecked: false,
     comment: '',
   },
   {
@@ -127,6 +136,7 @@ export const initialClips: Clip[] = [
     receivedAt: '2024-01-06T13:40:00.000Z',
     categoryId: 'design',
     isPinned: false,
+    isChecked: false,
     comment: '',
   },
   {
@@ -138,6 +148,7 @@ export const initialClips: Clip[] = [
     receivedAt: '2024-01-05T09:20:00.000Z',
     categoryId: 'design',
     isPinned: false,
+    isChecked: false,
     comment: '',
   },
   {
@@ -149,6 +160,7 @@ export const initialClips: Clip[] = [
     receivedAt: '2024-01-04T15:10:00.000Z',
     categoryId: 'design',
     isPinned: false,
+    isChecked: false,
     comment: '',
   },
 ]

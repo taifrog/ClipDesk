@@ -11,9 +11,13 @@ export interface Clip {
   receivedAt: string
   categoryId: string
   isPinned: boolean
+  // 確認済みチェックマーク（trueで確認済み）
+  isChecked: boolean
   comment: string
   // ゴミ箱に移動した日時（null の場合は通常のクリップ）
   deletedAt?: string | null
+  // 確認済みチェックマークをONにした日時（null の場合は未確認）
+  checkedAt?: string | null
 }
 
 // カテゴリ1件を表す型
@@ -22,4 +26,14 @@ export interface Category {
   id: string
   name: string
   icon: string
+}
+
+// クリップ収集元サイト1件を表す型
+// タグに紐づくサイトURLと自動検出したRSS URLを管理する
+export interface SourceSite {
+  id: number
+  tag: string
+  siteUrl: string
+  rssUrl: string | null
+  createdAt: string
 }

@@ -10,6 +10,7 @@ interface ClipGridProps {
   onDragStart: (clipId: number) => void
   onDragEnd: () => void
   onTogglePin: (id: number) => void
+  onToggleCheck: (id: number) => void
   onUpdateComment: (id: number, comment: string) => void
   onRestore?: (id: number) => void
 }
@@ -28,6 +29,7 @@ export function ClipGrid({
   onDragStart,
   onDragEnd,
   onTogglePin,
+  onToggleCheck,
   onUpdateComment,
   onRestore,
 }: ClipGridProps) {
@@ -48,6 +50,7 @@ export function ClipGrid({
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}
             onTogglePin={onTogglePin}
+            onToggleCheck={onToggleCheck}
             onUpdateComment={onUpdateComment}
             onRestore={onRestore}
           />

@@ -9,6 +9,7 @@ interface ClipCardProps {
   onDragStart: (clipId: number) => void
   onDragEnd: () => void
   onTogglePin: (id: number) => void
+  onToggleCheck: (id: number) => void
   onUpdateComment: (id: number, comment: string) => void
   onRestore?: (id: number) => void
 }
@@ -45,6 +46,24 @@ function CommentIcon() {
   )
 }
 
+// チェックマークアイコンを表示するコンポーネント
+// active: true の時はチェック済みマーク、false の時は空の四角を表示する
+function CheckIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      className={`check-icon ${active ? 'active' : ''}`}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      {active ? (
+        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+      ) : (
+        <rect x="4.5" y="4.5" width="15" height="15" rx="2.5" />
+      )}
+    </svg>
+  )
+}
+
 // クリップカードコンポーネント
 export function ClipCard({
   clip,
@@ -53,6 +72,7 @@ export function ClipCard({
   onDragStart,
   onDragEnd,
   onTogglePin,
+  onToggleCheck,
   onUpdateComment,
   onRestore,
 }: ClipCardProps) {
@@ -64,6 +84,11 @@ export function ClipCard({
   // ピン切り替えボタンクリック時
   const handlePinClick = () => {
     onTogglePin(clip.id)
+  }
+
+  // チェックマーク切り替えボタンクリック時
+  const handleCheckClick = () => {
+    onToggleCheck(clip.id)
   }
 
   // コメント編集を確定する
@@ -143,14 +168,24 @@ export function ClipCard({
             復元
           </button>
         ) : (
-          <button
-            type="button"
-            className="clip-card-favorite"
-            aria-label={clip.isPinned ? 'ピン留めを解除' : 'ピン留めする'}
-            onClick={handlePinClick}
-          >
-            <StarIcon active={clip.isPinned} />
-          </button>
+          <div className="clip-card-actions">
+            <button
+              type="button"
+              className="clip-card-check"
+              aria-label={clip.isChecked ? '確認済みを解除' : '確認済みにする'}
+              onClick={handleCheckClick}
+            >
+              <CheckIcon active={clip.isChecked} />
+            </button>
+            <button
+              type="button"
+              className="clip-card-favorite"
+              aria-label={clip.isPinned ? 'ピン留めを解除' : 'ピン留めする'}
+              onClick={handlePinClick}
+            >
+              <StarIcon active={clip.isPinned} />
+            </button>
+          </div>
         )}
       </div>
     </article>
