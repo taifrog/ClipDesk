@@ -37,3 +37,16 @@ export interface SourceSite {
   rssUrl: string | null
   createdAt: string
 }
+
+// サイト側（Webアプリ）のAI要約設定を表す型
+// SQLite の app_settings テーブルに永続化される
+export interface AiSummarySettings {
+  // AI要約機能の有効/無効
+  enabled: boolean
+  // OpenCode Go API キー
+  apiKey: string
+  // 使用するモデル名
+  model: string
+  // 要約する言語
+  language: string
+}

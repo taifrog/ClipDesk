@@ -5,8 +5,16 @@ import { Header } from './components/Header'
 import { SettingsDialog } from './components/SettingsDialog'
 import { Sidebar } from './components/Sidebar'
 import { initialCategories, initialClips } from './data/mock'
-import type { Category, Clip, SourceSite } from './types'
+import type { AiSummarySettings, Category, Clip, SourceSite } from './types'
 import './App.css'
+
+// AI要約設定のデフォルト値
+const DEFAULT_AI_SUMMARY_SETTINGS: AiSummarySettings = {
+  enabled: true,
+  apiKey: '',
+  model: 'gpt-4o-mini',
+  language: 'ja',
+}
 
 // APIから返されるクリップの生データをアプリ内のClip型に正規化する
 // categoryId / isPinned / comment がサーバー側で管理されているため、そのまま利用する
@@ -70,6 +78,8 @@ function App() {
   const [searchQuery, setSearchQuery] = useState<string>('')
   // 収集元サイト一覧の状態
   const [sourceSites, setSourceSites] = useState<SourceSite[]>([])
+  // AI要約設定の状態
+  const [aiSummarySettings, setAiSummarySettings] = useState<AiSummarySettings>(DEFAULT_AI_SUMMARY_SETTINGS)
   // クリップ収集ダイアログの表示状態
   const [isCollectDialogOpen, setIsCollectDialogOpen] = useState<boolean>(false)
   // 設定ダイアログの表示状態
@@ -89,10 +99,33 @@ function App() {
     }
   }, [])
 
+  // AI要約設定を取得する
+  const fetchAiSummarySettings = useCallback(async () => {
+    try {
+      const response = await fetch('/api/settings')
+      if (!response.ok) {
+        throw new Error(`AI要約設定の取得に失敗しました: ${response.status}`)
+      }
+      const data = await response.json()
+      const settings: AiSummarySettings = data.settings || DEFAULT_AI_SUMMARY_SETTINGS
+      setAiSummarySettings({
+        enabled: settings.enabled ?? DEFAULT_AI_SUMMARY_SETTINGS.enabled,
+        apiKey: settings.apiKey ?? DEFAULT_AI_SUMMARY_SETTINGS.apiKey,
+        model: settings.model || DEFAULT_AI_SUMMARY_SETTINGS.model,
+        language: settings.language || DEFAULT_AI_SUMMARY_SETTINGS.language,
+      })
+    } catch (err) {
+      console.error('AI要約設定取得失敗:', err)
+    }
+  }, [])
+
   // API からカテゴリとクリップを取得する
   const fetchData = useCallback(async (showLoading = false) => {
     if (showLoading) setIsLoading(true)
     try {
+      // AI要約設定も合わせて取得する
+      await fetchAiSummarySettings()
+
       // カテゴリを取得する
       const categoryResponse = await fetch('/api/category')
       if (!categoryResponse.ok) {
@@ -131,7 +164,7 @@ function App() {
     } finally {
       if (showLoading) setIsLoading(false)
     }
-  }, [fetchSourceSites])
+  }, [fetchSourceSites, fetchAiSummarySettings])
 
   // 初回表示時にデータを取得する
   useEffect(() => {
@@ -368,6 +401,32 @@ function App() {
     setIsSettingsDialogOpen(true)
   }
 
+  // AI要約設定保存時の処理
+  const handleSaveAiSummarySettings = async (settings: AiSummarySettings) => {
+    const response = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        aiSummaryEnabled: settings.enabled,
+        aiSummaryApiKey: settings.apiKey,
+        aiSummaryModel: settings.model,
+        aiSummaryLanguage: settings.language,
+      }),
+    })
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      throw new Error(data.error || 'AI要約設定の保存に失敗しました')
+    }
+    const data = await response.json()
+    const saved: AiSummarySettings = data.settings || settings
+    setAiSummarySettings({
+      enabled: saved.enabled ?? settings.enabled,
+      apiKey: saved.apiKey ?? settings.apiKey,
+      model: saved.model || settings.model,
+      language: saved.language || settings.language,
+    })
+  }
+
   // 収集元サイト追加時の処理
   const handleAddSourceSite = async (site: { tag: string; siteUrl: string }) => {
     const response = await fetch('/api/source-site', {
@@ -467,9 +526,11 @@ function App() {
       <SettingsDialog
         isOpen={isSettingsDialogOpen}
         sourceSites={sourceSites}
+        aiSummarySettings={aiSummarySettings}
         onClose={() => setIsSettingsDialogOpen(false)}
         onAddSourceSite={handleAddSourceSite}
         onDeleteSourceSite={handleDeleteSourceSite}
+        onSaveAiSummarySettings={handleSaveAiSummarySettings}
       />
 
       <main className="main-content">

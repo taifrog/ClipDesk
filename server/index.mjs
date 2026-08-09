@@ -58,6 +58,11 @@ db.exec(`
     rssUrl TEXT,
     createdAt TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `);
 
 // 既存のclipsテーブルに deletedAt カラムがなければ追加する
@@ -116,6 +121,84 @@ const upsertCategoryStmt = db.prepare(`
 `);
 for (const category of defaultCategories) {
   upsertCategoryStmt.run(category);
+}
+
+// サイト設定を取得する（存在しない場合はデフォルト値を返す）
+function getAppSettings() {
+  const keys = ['aiSummaryEnabled', 'aiSummaryApiKey', 'aiSummaryModel', 'aiSummaryLanguage'];
+  const defaults = {
+    aiSummaryEnabled: 'true',
+    aiSummaryApiKey: '',
+    aiSummaryModel: 'gpt-4o-mini',
+    aiSummaryLanguage: 'ja',
+  };
+  const settings = { ...defaults };
+  const selectStmt = db.prepare(`SELECT key, value FROM app_settings WHERE key IN (${keys.map(() => '?').join(',')})`);
+  const rows = selectStmt.all(...keys);
+  for (const row of rows) {
+    settings[row.key] = row.value;
+  }
+  return {
+    enabled: settings.aiSummaryEnabled === 'true',
+    apiKey: settings.aiSummaryApiKey,
+    model: settings.aiSummaryModel,
+    language: settings.aiSummaryLanguage,
+  };
+}
+
+// サイト設定を保存する
+function saveAppSettings(settings) {
+  const allowedKeys = new Set(['aiSummaryEnabled', 'aiSummaryApiKey', 'aiSummaryModel', 'aiSummaryLanguage']);
+  const insertStmt = db.prepare(`INSERT INTO app_settings (key, value) VALUES (@key, @value) ON CONFLICT(key) DO UPDATE SET value = excluded.value`);
+  for (const [key, value] of Object.entries(settings)) {
+    if (!allowedKeys.has(key)) continue;
+    insertStmt.run({ key, value: String(value) });
+  }
+}
+
+// テキストを指定文字数に制限する
+function truncateText(text, maxChars) {
+  if (!text) return '';
+  if (text.length <= maxChars) return text;
+  return text.slice(0, maxChars) + '\n…（以下省略）';
+}
+
+// OpenCode Go でテキストを要約する
+async function summarizeWithOpenCodeGo(text, title, settings) {
+  if (!settings.apiKey) {
+    throw new Error('OpenCode Go APIキーが設定されていません');
+  }
+  const bodyText = truncateText(text, 4000);
+  const prompt = `以下のWebページを「${settings.language === 'ja' ? '日本語' : settings.language}」で簡潔に要約してください。\n\nタイトル: ${title}\n\n本文:\n${bodyText}`;
+
+  const response = await fetch('https://opencode.ai/zen/go/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${settings.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: settings.model,
+      messages: [
+        { role: 'system', content: 'あなたはWebページの内容を要約するアシスタントです。' },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.5,
+      max_tokens: 500,
+      stream: false,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(`AI APIの呼び出しに失敗しました: ${response.status} ${errorText}`);
+  }
+
+  const data = await response.json();
+  if (!data.choices || data.choices.length === 0) {
+    throw new Error('AIからの応答が空です');
+  }
+  return String(data.choices[0].message.content || '').trim();
 }
 
 // URLからHTML/XMLテキストを取得する
@@ -514,9 +597,28 @@ app.delete('/api/source-site/:id', (req, res) => {
   if (Number.isNaN(id)) return res.status(400).json({ error: 'id が不正です' });
   const deleteStmt = db.prepare('DELETE FROM source_sites WHERE id = @id');
   const result = deleteStmt.run({ id });
-  if (result.changes === 0) return res.status(404).json({ error: 'サイトが見つかりません' });
+  if (result.changes === 0) return res.status(404).json({ error: 'サイトがみつかりません' });
   debugLog('収集元サイト削除', id);
   res.json({ ok: true, id });
+});
+
+// アプリ設定を取得する
+app.get('/api/settings', (_req, res) => {
+  const settings = getAppSettings();
+  res.json({ settings });
+});
+
+// アプリ設定を保存する
+app.post('/api/settings', (req, res) => {
+  const body = req.body || {};
+  const updates = {};
+  if (typeof body.aiSummaryEnabled === 'boolean') updates.aiSummaryEnabled = String(body.aiSummaryEnabled);
+  if (typeof body.aiSummaryApiKey === 'string') updates.aiSummaryApiKey = body.aiSummaryApiKey;
+  if (typeof body.aiSummaryModel === 'string') updates.aiSummaryModel = body.aiSummaryModel;
+  if (typeof body.aiSummaryLanguage === 'string') updates.aiSummaryLanguage = body.aiSummaryLanguage;
+  saveAppSettings(updates);
+  debugLog('アプリ設定保存', Object.keys(updates).join(', '));
+  res.json({ ok: true, settings: getAppSettings() });
 });
 
 // クリップ収集実行
@@ -540,6 +642,9 @@ app.post('/api/collect', async (req, res) => {
     return res.status(404).json({ error: '該当するタグの収集元サイトが登録されていません。設定から追加してください。' });
   }
 
+  // AI要約設定を取得する
+  const aiSettings = getAppSettings();
+
   const collected = [];
   for (const site of matchedSites) {
     if (collected.length >= count) break;
@@ -549,10 +654,23 @@ app.post('/api/collect', async (req, res) => {
       // 重複チェック（URLで判定）
       const exists = db.prepare(`SELECT id FROM clips WHERE url = @url AND deletedAt IS NULL`).get({ url: article.url });
       if (exists) continue;
+
+      let summary = article.summary || '';
+      // AI要約が有効でAPIキーが設定されている場合、RSSの要約本文を使って要約を生成する
+      if (aiSettings.enabled && aiSettings.apiKey && summary) {
+        try {
+          const aiSummary = await summarizeWithOpenCodeGo(summary, article.title, aiSettings);
+          if (aiSummary) summary = aiSummary;
+        } catch (err) {
+          debugLog('AI要約失敗', `${article.url}: ${err.message}`);
+          // 要約に失敗しても収集は続行し、元の要約を使用する
+        }
+      }
+
       const clip = {
         url: article.url,
         title: article.title,
-        summary: article.summary,
+        summary,
         rawBody: '',
         categoryId: 'others',
         isPinned: 0,
