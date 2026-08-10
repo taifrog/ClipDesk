@@ -53,3 +53,16 @@ export interface AiSummarySettings {
   // 要約する言語
   language: string
 }
+
+// Chrome 拡張機能等で使用する API キー1件を表す型
+export interface UserApiKey {
+  id: number
+  // ユーザーが判別しやすいラベル
+  label: string
+  // 作成日時
+  createdAt: string
+  // 最終使用日時（未使用の場合は null）
+  lastUsedAt?: string | null
+  // 発行直後のみ含まれる平文キー（以降は復元不可）
+  rawKey?: string
+}

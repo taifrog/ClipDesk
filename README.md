@@ -7,20 +7,21 @@
 - React 19
 - TypeScript
 - Vite
-- Express
-- better-sqlite3
+- Supabase（Postgres / Auth / Edge Functions / Hosting）
+
+> **Note:** 旧 Express + better-sqlite3 バックエンドは非推奨です。新規機能は Supabase Edge Functions として実装されています。`server/` 以下はローカル開発や旧データ参照のために残されています。
 
 ## スクリプト
 
 - `npm run dev` — フロントエンド開発サーバーを起動
-- `npm run server` — API サーバー（SQLite）を起動
+- `npm run server` — 旧 Express/SQLite API サーバーを起動（非推奨）
 - `npm run build` — 本番用ビルド
 - `npm run preview` — ビルド結果をプレビュー
 - `npm run lint` — oxlint で構文チェック
 
 ## 利用手順
 
-ClipDesk は「Webサイト」「APIサーバー」「ブラウザ拡張機能」の3つで動作します。
+ClipDesk は「Webサイト」「Supabase プロジェクト」「ブラウザ拡張機能」の3つで動作します。
 
 ### 1. 依存関係をインストールする
 
@@ -29,19 +30,35 @@ cd c:/data/Github/ClipDesk
 npm install
 ```
 
-### 2. API サーバーを起動する
+### 2. Supabase ローカル環境を起動する（初回のみ）
 
-SQLite ファイルでクリップとカテゴリを永続化します。
+[Supabase CLI](https://supabase.com/docs/guides/cli/getting-started) をインストール済みの場合、ローカルプロジェクトを起動できます。
 
 ```bash
-npm run server
+supabase login
+supabase start
 ```
 
-`http://localhost:3001/` で API サーバーが待ち受けます。
+`supabase start` の出力に表示された URL / anon key を `.env` に設定してください。
 
-### 3. フロントエンド開発サーバーを起動する
+### 3. 環境変数を設定する
 
-別のターミナルで実行してください。
+`.env.example` をコピーして `.env` を作成します。
+
+```bash
+cp .env.example .env
+```
+
+```env
+# Supabase プロジェクト設定
+# ローカル開発時は `supabase status` で表示された URL / anon key を設定する
+VITE_SUPABASE_URL=http://127.0.0.1:54321
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
+
+本番環境では、GitHub Actions の Secrets（`VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY`）から注入されます。
+
+### 4. フロントエンド開発サーバーを起動する
 
 ```bash
 npm run dev
@@ -49,7 +66,7 @@ npm run dev
 
 `http://localhost:5173/`（ポートが使われている場合は `http://localhost:5174/` など）でサイトが開きます。
 
-### 4. 拡張機能をビルドする
+### 5. 拡張機能をビルドする
 
 別のターミナルで実行してください。
 
@@ -61,33 +78,46 @@ npm run build
 
 ビルド後、`addon-chrome/dist/` に読み込み可能な拡張機能が生成されます。
 
-### 5. ブラウザに拡張機能を読み込む
+### 6. ブラウザに拡張機能を読み込む
 
 1. Chrome または Comet で `chrome://extensions/` を開く
 2. 「デベロッパー モード」を有効化
 3. 「パッケージ化されていない拡張機能を読み込む」で `addon-chrome/dist` を選択
 
-### 6. 拡張機能のオプションを設定する
+### 7. 拡張機能のオプションを設定する
 
 拡張機能アイコンを右クリック →「オプション」から、以下を設定してください。
 
-- **投稿先 URL**: `http://localhost:3001/api/clip`
+- **ClipDesk サイト URL**: `https://your-project.supabase.co`（ローカル開発時は `http://localhost:5173`）
+- **API キー**: ClipDesk サイトの「設定」→「拡張機能 API キー」で発行したキー
 
-要約は ClipDesk サイト側の AI 設定で行われるため、拡張機能側に API キーなどは不要です。
-
-### 7. クリップを投稿する
+### 8. クリップを投稿する
 
 1. クリップしたいページを開く
 2. 拡張機能アイコンをクリック
 3. 「クリップを作成」ボタンを押す
 4. ClipDesk サイトにページ情報が投稿され、サイト側の設定に応じて要約が行われる
 
-### 8. サイトで整理する
+### 9. サイトで整理する
 
 - 左サイドバーからカテゴリを選択してフィルタリング
 - クリップカードをドラッグ＆ドロップでサイドバーのカテゴリに分類
 - 星アイコンでピン留め
 - カード下部の「コメントを追加…」からメモを追加
+
+## Supabase プロジェクト構成
+
+- **Database**: Postgres + Row Level Security（RLS）
+- **Auth**: メール / パスワード認証（JWT）
+- **Edge Functions**: `supabase/functions/` 以下に配置
+  - `clip` — クリップの作成・更新・削除
+  - `clips` — クリップ一覧・ゴミ箱
+  - `categories` — カテゴリ管理
+  - `source-sites` — 収集元サイト管理
+  - `settings` — AI 要約設定
+  - `collect` — RSS/スクレイピングによる記事収集
+  - `user-api-keys` — Chrome 拡張機能用 API キー管理
+- **Hosting**: `npm run build` で生成された `dist/` をデプロイ
 
 ## ブラウザ拡張機能（addon-chrome）
 
@@ -96,7 +126,8 @@ npm run build
 ### 機能
 
 - アクティブなタブの URL・タイトル・本文を取得
-- ClipDesk ローカルサイトにページ情報を投稿（要約はサイト側で実行）
+- ClipDesk Supabase Edge Function（`clip`）へページ情報を投稿
+- API キー認証（`x-api-key` ヘッダー）に対応
 
 ### 開発手順
 
@@ -117,6 +148,35 @@ npm run build
 
 拡張機能アイコンを右クリック →「オプション」から、以下を設定してください。
 
-- 投稿先 ClipDesk ローカルサイト URL
+- **ClipDesk サイト URL**: Supabase プロジェクトの URL またはローカル開発サーバーの URL
+- **API キー**: ClipDesk サイトの「設定」→「拡張機能 API キー」で発行したキー
 
-要約は ClipDesk サイト側の AI 設定で行われるため、拡張機能側に API キーなどは不要です。
+## CI / CD（GitHub Actions）
+
+`.github/workflows/deploy.yml` で、main ブランチへの push 時に以下を自動実行します。
+
+1. フロントエンドをビルド（`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` を Secrets から注入）
+2. Supabase Hosting へ `dist/` をデプロイ
+3. データベースマイグレーションを適用（`supabase db push`）
+4. Edge Functions をデプロイ（`supabase functions deploy`）
+
+### 必要な GitHub Secrets
+
+| Secret | 説明 |
+| --- | --- |
+| `VITE_SUPABASE_URL` | フロントエンド用 Supabase プロジェクト URL |
+| `VITE_SUPABASE_ANON_KEY` | フロントエンド用 Supabase anon key |
+| `SUPABASE_ACCESS_TOKEN` | Supabase CLI 用アクセストークン |
+| `SUPABASE_PROJECT_ID` | Supabase プロジェクト参照 ID（例：`xxxxxxxxxxxxxxxxxxxx`）|
+| `SUPABASE_DB_PASSWORD` | 本番 DB のパスワード |
+
+手動実行も可能です。GitHub リポジトリの「Actions」→「Deploy to Supabase」→「Run workflow」から実行してください。
+
+## ローカル開発時の Vite プロキシ
+
+`vite.config.ts` では、以下のプロキシが設定されています。
+
+- `/api` → `http://localhost:3001`（旧 Express サーバー、非推奨）
+- `/functions/v1` → `http://localhost:54321`（Supabase ローカル Edge Functions）
+
+ローカル開発時は、フロントエンドから Supabase Edge Functions への呼び出しが `/functions/v1/*` 経由で行われます。

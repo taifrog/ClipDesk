@@ -1,3 +1,6 @@
+# [非推奨] 旧 Express/SQLite サーバー（server/index.mjs）へコードを追記するユーティリティ
+# Supabase 移行後は使用しません。履歴保持のため残しています。
+
 import pathlib
 
 tail = r'''

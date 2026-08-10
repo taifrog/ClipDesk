@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
   let body: ClipPayload;
   try {
     body = await req.json();
-  } catch (_err) {
+  } catch {
     return new Response(JSON.stringify({ error: 'リクエストボディをJSONとして解析できません' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

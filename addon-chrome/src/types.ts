@@ -13,7 +13,7 @@ export interface ExtensionMessage {
   payload?: unknown;
 }
 
-// ClipDesk ローカルサイトへの投稿ペイロード
+// ClipDesk への投稿ペイロード
 // 要約はサイト側で行うため、アドオンからは summary を空で送信する
 export interface ClipPayload {
   url: string;
@@ -24,5 +24,11 @@ export interface ClipPayload {
 
 // ストレージに保存する設定
 export interface ExtensionSettings {
-  localSiteUrl: string; // 投稿先ClipDeskローカルサイトURL
+  // 投稿先 ClipDesk URL
+  // ローカル開発時: http://localhost:54321/functions/v1/clip
+  // Supabase Hosting 時: https://<project>.supabase.co/functions/v1/clip
+  siteUrl: string;
+  // Supabase Edge Functions 呼び出し用 API key
+  // Web アプリの設定画面で発行した key を設定する
+  apiKey: string;
 }

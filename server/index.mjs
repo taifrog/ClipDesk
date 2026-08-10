@@ -1,5 +1,6 @@
-// ClipDesk APIサーバー
-// SQLiteファイルでクリップとカテゴリを永続化する
+// [非推奨] ClipDesk 旧 Express/SQLite API サーバー
+// Supabase 移行後は使用しません。ローカル開発や旧データ参照のため残しています。
+// 新規機能は supabase/functions/ 配下の Edge Functions に実装してください。
 
 import express from 'express';
 import cors from 'cors';
@@ -304,7 +305,7 @@ async function detectRssUrl(siteUrl) {
       if (text.trim().startsWith('<?xml') || text.trim().startsWith('<rss') || text.trim().startsWith('<feed')) {
         return candidate;
       }
-    } catch (err) {
+    } catch {
       // 無視
     }
   }
@@ -361,9 +362,9 @@ function scrapeArticles(html, siteUrl) {
       seen.add(url);
       const parsed = new URL(url);
       const hostMatch = parsed.hostname === new URL(siteUrl).hostname;
-      const isArticleLike = /\/(\d{4}[\/\-]\d{2}|\d{4}\/\d{2}\/\d{2}|\d{4}-\d{2}-\d{2}|articles?|posts?|news|entry|p=|post_id=)/i.test(parsed.pathname);
+      const isArticleLike = /\/(\d{4}\/\d{2}|\d{4}\/\d{2}\/\d{2}|\d{4}-\d{2}-\d{2}|articles?|posts?|news|entry|p=|post_id=)/i.test(parsed.pathname);
       if (hostMatch && isArticleLike) items.push({ title, url, summary: '' });
-    } catch (err) {
+    } catch {
       // 無視
     }
   });

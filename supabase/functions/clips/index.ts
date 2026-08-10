@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
       let updates: ClipUpdateBody;
       try {
         updates = await req.json();
-      } catch (_err) {
+      } catch {
         return new Response(JSON.stringify({ error: 'JSONボディが不正です' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

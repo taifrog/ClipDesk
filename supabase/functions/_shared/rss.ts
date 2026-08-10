@@ -37,7 +37,7 @@ export async function detectRssUrl(siteUrl: string): Promise<string | null> {
   let html = '';
   try {
     html = await fetchText(siteUrl);
-  } catch (_err) {
+  } catch {
     return null;
   }
 
@@ -67,7 +67,7 @@ export async function detectRssUrl(siteUrl: string): Promise<string | null> {
       if (trimmed.startsWith('<?xml') || trimmed.startsWith('<rss') || trimmed.startsWith('<feed')) {
         return candidate;
       }
-    } catch (_err) {
+    } catch {
       // 無視
     }
   }
@@ -142,11 +142,11 @@ export function scrapeArticles(html: string, siteUrl: string): ArticleItem[] {
       seen.add(url);
       const parsed = new URL(url);
       const hostMatch = parsed.hostname === baseHost;
-      const isArticleLike = /\/(\d{4}[\/\-]\d{2}|\d{4}\/\d{2}\/\d{2}|\d{4}-\d{2}-\d{2}|articles?|posts?|news|entry|p=|post_id=)/i.test(parsed.pathname);
+      const isArticleLike = /\/(\d{4}\/\d{2}|\d{4}\/\d{2}\/\d{2}|\d{4}-\d{2}-\d{2}|articles?|posts?|news|entry|p=|post_id=)/i.test(parsed.pathname);
       if (hostMatch && isArticleLike) {
         items.push({ title, url, summary: '' });
       }
-    } catch (_err) {
+    } catch {
       // 無視
     }
   });
@@ -160,7 +160,7 @@ export async function collectArticlesFromSite(siteUrl: string, rssUrl: string | 
     try {
       const xmlText = await fetchText(rssUrl);
       articles = parseRss(xmlText, siteUrl);
-    } catch (_err) {
+    } catch {
       // RSS 取得失敗は無視
     }
   }
@@ -168,7 +168,7 @@ export async function collectArticlesFromSite(siteUrl: string, rssUrl: string | 
     try {
       const html = await fetchText(siteUrl);
       articles = scrapeArticles(html, siteUrl);
-    } catch (_err) {
+    } catch {
       // スクレイピング失敗は無視
     }
   }

@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
     let body: SourceSiteBody;
     try {
       body = await req.json();
-    } catch (_err) {
+    } catch {
       return new Response(JSON.stringify({ error: 'JSONボディが不正です' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
     let rssUrl: string | null = null;
     try {
       rssUrl = await detectRssUrl(siteUrl);
-    } catch (_err) {
+    } catch {
       // RSS検出失敗は無視してサイト登録を続行
     }
 
