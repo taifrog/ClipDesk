@@ -38,6 +38,9 @@ export interface SourceSite {
   createdAt: string
 }
 
+// クリップ一覧の並び替えモードを表す型
+export type SortMode = 'newest' | 'oldest' | 'category'
+
 // サイト側（Webアプリ）のAI要約設定を表す型
 // SQLite の app_settings テーブルに永続化される
 export interface AiSummarySettings {

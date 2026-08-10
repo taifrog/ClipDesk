@@ -5,7 +5,7 @@ import { Header } from './components/Header'
 import { SettingsDialog } from './components/SettingsDialog'
 import { Sidebar } from './components/Sidebar'
 import { initialCategories, initialClips } from './data/mock'
-import type { AiSummarySettings, Category, Clip, SourceSite } from './types'
+import type { AiSummarySettings, Category, Clip, SortMode, SourceSite } from './types'
 import './App.css'
 
 // AI要約設定のデフォルト値
@@ -76,6 +76,8 @@ function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false)
   // 検索クエリ
   const [searchQuery, setSearchQuery] = useState<string>('')
+  // クリップ一覧の並び替えモード
+  const [sortMode, setSortMode] = useState<SortMode>('newest')
   // 収集元サイト一覧の状態
   const [sourceSites, setSourceSites] = useState<SourceSite[]>([])
   // AI要約設定の状態
@@ -189,7 +191,18 @@ function App() {
     return found?.name ?? 'すべてのクリップ'
   }, [categories, selectedCategoryId])
 
+  // 2つのクリップの受信日時を比較する（新しい順）
+  const compareReceivedAtDesc = (a: Clip, b: Clip) => {
+    return new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
+  }
+
+  // 2つのクリップの受信日時を比較する（古い順）
+  const compareReceivedAtAsc = (a: Clip, b: Clip) => {
+    return new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime()
+  }
+
   // 表示対象のクリップ一覧（通常 or ゴミ箱）
+  // 並び替えモードに応じてソートする（ゴミ箱は常に削除日時降順）
   const displayClips = useMemo(() => {
     if (selectedCategoryId === 'trash') return trashClips
 
@@ -198,24 +211,56 @@ function App() {
       filtered = clips.filter((clip) => clip.categoryId === selectedCategoryId)
     }
 
-    if (!searchQuery.trim()) return filtered
-    const query = searchQuery.toLowerCase()
-    return filtered.filter(
-      (clip) =>
-        clip.title.toLowerCase().includes(query) ||
-        clip.summary.toLowerCase().includes(query),
-    )
-  }, [clips, trashClips, selectedCategoryId, searchQuery])
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(
+        (clip) =>
+          clip.title.toLowerCase().includes(query) ||
+          clip.summary.toLowerCase().includes(query),
+      )
+    }
+
+    // カテゴリ別モード以外は受信日時でソート
+    if (sortMode === 'newest') {
+      return [...filtered].sort(compareReceivedAtDesc)
+    }
+    if (sortMode === 'oldest') {
+      return [...filtered].sort(compareReceivedAtAsc)
+    }
+    return filtered
+  }, [clips, trashClips, selectedCategoryId, searchQuery, sortMode])
 
   // 上段に表示するピン留めクリップ（最大4件）
+  // カテゴリ別モード時はピン留めも各カテゴリに含めるため使用しない
   const pinnedClips = useMemo(() => {
+    if (sortMode === 'category') return []
     return displayClips.filter((clip) => clip.isPinned).slice(0, 4)
-  }, [displayClips])
+  }, [displayClips, sortMode])
 
   // 下段に表示する通常クリップ（最大16件）
+  // カテゴリ別モード時はピン留めも各カテゴリに含めるため使用しない
   const normalClips = useMemo(() => {
+    if (sortMode === 'category') return []
     return displayClips.filter((clip) => !clip.isPinned).slice(0, 16)
-  }, [displayClips])
+  }, [displayClips, sortMode])
+
+  // カテゴリ別モードで表示するカテゴリごとのクリップグループ
+  const categoryGroups = useMemo(() => {
+    if (sortMode !== 'category' || selectedCategoryId === 'trash') return []
+
+    // すべて/ゴミ箱以外のカテゴリを表示順（sortOrder相当）に並べる
+    const visibleCategories = categories.filter((cat) => cat.id !== 'all' && cat.id !== 'trash')
+
+    return visibleCategories
+      .map((category) => {
+        const categoryClips = displayClips
+          .filter((clip) => clip.categoryId === category.id)
+          .sort(compareReceivedAtDesc)
+          .slice(0, 16)
+        return { category, clips: categoryClips }
+      })
+      .filter((group) => group.clips.length > 0)
+  }, [categories, displayClips, selectedCategoryId, sortMode])
 
   // カテゴリ選択時の処理
   const handleSelectCategory = (categoryId: string) => {
@@ -225,6 +270,11 @@ function App() {
   // 検索クエリ変更時の処理
   const handleSearchChange = (query: string) => {
     setSearchQuery(query)
+  }
+
+  // 並び替えモード変更時の処理
+  const handleSortChange = (mode: SortMode) => {
+    setSortMode(mode)
   }
 
   // クリップ情報を API 経由で更新する
@@ -569,6 +619,8 @@ function App() {
           count={displayClips.length}
           searchQuery={searchQuery}
           onSearchChange={handleSearchChange}
+          sortMode={sortMode}
+          onSortChange={handleSortChange}
         />
 
         <div className="clip-content">
@@ -580,6 +632,21 @@ function App() {
                 ? 'ゴミ箱は空です。'
                 : 'このカテゴリにはクリップがありません。'}
             </p>
+          ) : sortMode === 'category' && selectedCategoryId !== 'trash' ? (
+            // カテゴリ別モード：カテゴリごとにグループ化して表示
+            categoryGroups.map(({ category, clips: groupClips }) => (
+              <ClipGrid
+                key={category.id}
+                title={category.name}
+                clips={groupClips}
+                categories={categories}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onTogglePin={handleTogglePin}
+                onToggleCheck={handleToggleCheck}
+                onUpdateComment={handleUpdateComment}
+              />
+            ))
           ) : (
             <>
               <ClipGrid
