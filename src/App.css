@@ -1159,3 +1159,82 @@
     align-items: flex-start;
   }
 }
+
+/* 認証画面レイアウト */
+.auth-layout {
+  align-items: center;
+  justify-content: center;
+  min-height: 100svh;
+  padding: 24px;
+}
+
+.auth-loading {
+  align-items: center;
+  justify-content: center;
+  min-height: 100svh;
+  color: var(--text);
+}
+
+/* 認証パネル */
+.auth-panel {
+  width: 100%;
+  max-width: 380px;
+  padding: 32px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+}
+
+.auth-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 24px;
+  text-align: center;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-error {
+  color: #ef4444;
+  font-size: 13px;
+  margin: 0;
+}
+
+.auth-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 20px 0 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.button-link {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.button-link:hover {
+  opacity: 0.8;
+}
+
+/* ログアウトエリア */
+.logout-area {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 16px;
+  margin-top: auto;
+}

@@ -6,3 +6,6 @@
 - [x] App.tsx で設定の取得・保存を連携
 - [x] /api/collect で AI 要約を実行するように改修
 - [x] TypeScript / 構文チェック
+- [x] Supabase 移行：クライアント設定・認証 UI・App.tsx 改修
+- [x] Edge Functions 対応：clip / clips / categories / source-sites / settings / collect
+- [x] Vite プロキシ・環境変数例を追加
