@@ -4,8 +4,10 @@ import type { ExtensionSettings } from './types';
 
 // 設定のデフォルト値
 const DEFAULT_SETTINGS: ExtensionSettings = {
-  // テスト用簡易APIサーバーへの投稿先
-  localSiteUrl: 'http://localhost:3001/api/clip',
+  // ローカル開発時の Supabase Edge Functions エンドポイント
+  siteUrl: 'http://localhost:54321/functions/v1/clip',
+  // API key は未設定状態で初期化（ユーザーが設定画面で入力する）
+  apiKey: '',
 };
 
 // ストレージキー

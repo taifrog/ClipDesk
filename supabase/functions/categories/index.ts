@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
     let body: CategoryBody;
     try {
       body = await req.json();
-    } catch (_err) {
+    } catch {
       return new Response(JSON.stringify({ error: 'JSONボディが不正です' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
       let body: Partial<CategoryBody>;
       try {
         body = await req.json();
-      } catch (_err) {
+      } catch {
         return new Response(JSON.stringify({ error: 'JSONボディが不正です' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

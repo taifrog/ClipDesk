@@ -8,7 +8,7 @@ import { Sidebar } from './components/Sidebar'
 import { AuthPanel } from './components/AuthPanel'
 import { initialCategories, initialClips } from './data/mock'
 import { getSupabaseClient } from './lib/supabase'
-import type { AiSummarySettings, Category, Clip, SortMode, SourceSite } from './types'
+import type { AiSummarySettings, Category, Clip, SortMode, SourceSite, UserApiKey } from './types'
 import './App.css'
 
 // AI要約設定のデフォルト値
@@ -89,6 +89,14 @@ function App() {
   const [isCollectDialogOpen, setIsCollectDialogOpen] = useState<boolean>(false)
   // 設定ダイアログの表示状態
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState<boolean>(false)
+  // 拡張機能用 API キー一覧の状態
+  const [apiKeys, setApiKeys] = useState<UserApiKey[]>([])
+  // API キー一覧読み込み中フラグ
+  const [isLoadingApiKeys, setIsLoadingApiKeys] = useState<boolean>(false)
+  // API キー一覧取得エラー
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null)
+  // 発行直後の平文 API キー
+  const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null)
 
   const supabase = getSupabaseClient()
 
@@ -171,6 +179,81 @@ function App() {
       console.error('AI要約設定取得失敗:', err)
     }
   }, [session, getAuthHeaders])
+
+  // 拡張機能用 API キー一覧を取得する
+  const fetchApiKeys = useCallback(async () => {
+    if (!session) return
+    setIsLoadingApiKeys(true)
+    setApiKeyError(null)
+    try {
+      const response = await fetch(`${FUNCTIONS_BASE}/user-api-keys`, {
+        headers: getAuthHeaders(false),
+      })
+      if (!response.ok) {
+        throw new Error(`API キーの取得に失敗しました: ${response.status}`)
+      }
+      const data = await response.json()
+      setApiKeys(
+        (data.keys || []).map((raw: Record<string, unknown>): UserApiKey => ({
+          id: Number(raw.id),
+          label: String(raw.label ?? ''),
+          createdAt: String(raw.created_at),
+          lastUsedAt: raw.last_used_at ? String(raw.last_used_at) : null,
+        })),
+      )
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'API キーの取得に失敗しました'
+      setApiKeyError(message)
+      console.error('API キー取得失敗:', err)
+    } finally {
+      setIsLoadingApiKeys(false)
+    }
+  }, [session, getAuthHeaders])
+
+  // 拡張機能用 API キーを新規発行する
+  const handleCreateApiKey = useCallback(
+    async (label: string) => {
+      if (!session) return
+      const response = await fetch(`${FUNCTIONS_BASE}/user-api-keys`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ label }),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'API キーの発行に失敗しました')
+      }
+      const data = await response.json()
+      const rawKey = data.key?.rawKey
+      if (rawKey) {
+        setNewlyCreatedKey(String(rawKey))
+      }
+      await fetchApiKeys()
+    },
+    [session, getAuthHeaders, fetchApiKeys],
+  )
+
+  // 拡張機能用 API キーを削除する
+  const handleDeleteApiKey = useCallback(
+    async (id: number) => {
+      if (!session) return
+      const response = await fetch(`${FUNCTIONS_BASE}/user-api-keys/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(false),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'API キーの削除に失敗しました')
+      }
+      setApiKeys((prev) => prev.filter((key) => key.id !== id))
+    },
+    [session, getAuthHeaders],
+  )
+
+  // 発行直後の API キー表示をクリアする
+  const handleClearNewlyCreatedKey = useCallback(() => {
+    setNewlyCreatedKey(null)
+  }, [])
 
   // Edge Functions からカテゴリとクリップを取得する
   const fetchData = useCallback(
@@ -713,10 +796,18 @@ function App() {
         isOpen={isSettingsDialogOpen}
         sourceSites={sourceSites}
         aiSummarySettings={aiSummarySettings}
+        apiKeys={apiKeys}
+        isLoadingApiKeys={isLoadingApiKeys}
+        apiKeyError={apiKeyError}
+        newlyCreatedKey={newlyCreatedKey}
         onClose={() => setIsSettingsDialogOpen(false)}
         onAddSourceSite={handleAddSourceSite}
         onDeleteSourceSite={handleDeleteSourceSite}
         onSaveAiSummarySettings={handleSaveAiSummarySettings}
+        onFetchApiKeys={fetchApiKeys}
+        onCreateApiKey={handleCreateApiKey}
+        onDeleteApiKey={handleDeleteApiKey}
+        onClearNewlyCreatedKey={handleClearNewlyCreatedKey}
       />
 
       <main className="main-content">

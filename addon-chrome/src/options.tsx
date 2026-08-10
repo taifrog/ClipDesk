@@ -1,5 +1,5 @@
 // オプション画面
-// 投稿先URLなどの設定を管理する
+// 投稿先URL・API key などの設定を管理する
 
 import { useEffect, useState } from 'react';
 import { loadSettings, saveSettings } from './storage';
@@ -51,13 +51,30 @@ function Options() {
           </label>
           <input
             type="url"
-            value={settings.localSiteUrl}
-            onChange={(e) => handleChange('localSiteUrl', e.target.value)}
+            value={settings.siteUrl}
+            onChange={(e) => handleChange('siteUrl', e.target.value)}
             style={{ width: '100%', padding: 8, fontSize: 14 }}
-            placeholder="http://localhost:3001/api/clip"
+            placeholder="https://<project>.supabase.co/functions/v1/clip"
           />
           <p style={{ margin: '4px 0 0', fontSize: 12, color: '#666' }}>
-            要約は ClipDesk サイト側の設定で行われます。
+            Supabase Edge Functions の clip エンドポイントを指定してください。
+            ローカル開発時は http://localhost:54321/functions/v1/clip です。
+          </p>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'block', marginBottom: 4, fontWeight: 'bold' }}>
+            API キー
+          </label>
+          <input
+            type="password"
+            value={settings.apiKey}
+            onChange={(e) => handleChange('apiKey', e.target.value)}
+            style={{ width: '100%', padding: 8, fontSize: 14 }}
+            placeholder="Webアプリの設定画面で発行した API キー"
+          />
+          <p style={{ margin: '4px 0 0', fontSize: 12, color: '#666' }}>
+            Web アプリの設定画面で発行した API キーを入力してください。未設定の場合は投稿できません。
           </p>
         </div>
 

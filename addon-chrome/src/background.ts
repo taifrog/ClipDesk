@@ -49,11 +49,17 @@ async function getActivePageInfo(): Promise<PageInfo> {
   }
 }
 
-// ClipDesk ローカルサイトにクリップを投稿する
-async function postToClipDesk(payload: ClipPayload, localSiteUrl: string): Promise<void> {
-  const response = await fetch(localSiteUrl, {
+// ClipDesk（Supabase Edge Functions）にクリップを投稿する
+// @param payload 送信するクリップ情報
+// @param siteUrl 投稿先 URL
+// @param apiKey x-api-key ヘッダーに付与する API キー
+async function postToClipDesk(payload: ClipPayload, siteUrl: string, apiKey: string): Promise<void> {
+  const response = await fetch(siteUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+    },
     body: JSON.stringify(payload),
   });
 
@@ -64,12 +70,15 @@ async function postToClipDesk(payload: ClipPayload, localSiteUrl: string): Promi
 }
 
 // クリップ作成の一連の処理を実行する
-// ページ情報取得 → ローカルサイトへの投稿（要約はサイト側で行う）
+// ページ情報取得 → Edge Function への投稿（要約はサイト側で行う）
 async function createClip(): Promise<{ ok: true; payload: ClipPayload } | { ok: false; error: string }> {
   try {
     const settings = await getSettings();
-    if (!settings.localSiteUrl) {
+    if (!settings.siteUrl) {
       return { ok: false, error: '投稿先URLが設定されていません。オプション画面から設定してください。' };
+    }
+    if (!settings.apiKey) {
+      return { ok: false, error: 'API キーが設定されていません。Webアプリの設定画面で発行してください。' };
     }
 
     const info = await getActivePageInfo();
@@ -82,7 +91,7 @@ async function createClip(): Promise<{ ok: true; payload: ClipPayload } | { ok: 
 
     debug(`送信ペイロード: rawBody=${payload.rawBody ? payload.rawBody.length : 0}文字, title=${payload.title.slice(0, 50)}`);
 
-    await postToClipDesk(payload, settings.localSiteUrl);
+    await postToClipDesk(payload, settings.siteUrl, settings.apiKey);
     return { ok: true, payload };
   } catch (err) {
     const message = err instanceof Error ? err.message : '不明なエラーが発生しました';

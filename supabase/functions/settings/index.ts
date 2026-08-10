@@ -39,8 +39,8 @@ Deno.serve(async (req) => {
     let body: Record<string, unknown>;
     try {
       body = await req.json();
-    } catch (_err) {
-      return new Response(JSON.stringify({ error: 'JSONボディが不正です' }), {
+  } catch {
+    return new Response(JSON.stringify({ error: 'JSONボディが不正です' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

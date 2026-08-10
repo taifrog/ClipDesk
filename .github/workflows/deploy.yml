@@ -1,0 +1,76 @@
+name: Deploy to Supabase
+
+on:
+  push:
+    branches:
+      - main
+
+  # 手動実行も可能
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # フロントエンドをビルドして Supabase Hosting へデプロイ
+  deploy-web:
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Node.js をセットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 依存パッケージをインストール
+        run: npm ci
+
+      # 本番ビルド時に GitHub Secrets から環境変数を注入する
+      - name: フロントエンドをビルド
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: npm run build
+
+      - name: Supabase CLI をセットアップ
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_ID で対象プロジェクトを指定
+      - name: Supabase Hosting へデプロイ
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: supabase hosting deploy --project-ref "$SUPABASE_PROJECT_ID" --directory dist
+
+  # データベースマイグレーションと Edge Functions をデプロイ
+  deploy-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Supabase CLI をセットアップ
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # 本番 DB へのマイグレーション適用
+      - name: マイグレーションを適用
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: supabase db push --project-ref "$SUPABASE_PROJECT_ID"
+
+      # Edge Functions をデプロイ
+      - name: Edge Functions をデプロイ
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_ID"
