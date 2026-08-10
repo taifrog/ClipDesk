@@ -719,7 +719,9 @@ app.post('/api/collect', async (req, res) => {
     for (const article of articles) {
       if (collected.length >= count) break;
       // 重複チェック（URLで判定）
-      const exists = db.prepare(`SELECT id FROM clips WHERE url = @url AND deletedAt IS NULL`).get({ url: article.url });
+      // 通常クリップだけでなく、ゴミ箱内のクリップも含めて重複を排除する
+      // 完全に削除されたレコードは clips テーブルに存在しないため対象外となる
+      const exists = db.prepare(`SELECT id FROM clips WHERE url = @url`).get({ url: article.url });
       if (exists) continue;
 
       let summary = article.summary || '';
