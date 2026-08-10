@@ -13,6 +13,11 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
+      // ローカル開発時に Supabase Edge Functions へプロキシする
+      '/functions/v1': {
+        target: 'http://localhost:54321',
+        changeOrigin: true,
+      },
     },
   },
 })

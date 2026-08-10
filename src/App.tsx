@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { Session } from '@supabase/supabase-js'
 import { ClipGrid } from './components/ClipGrid'
 import { CollectDialog } from './components/CollectDialog'
 import { Header } from './components/Header'
 import { SettingsDialog } from './components/SettingsDialog'
 import { Sidebar } from './components/Sidebar'
+import { AuthPanel } from './components/AuthPanel'
 import { initialCategories, initialClips } from './data/mock'
+import { getSupabaseClient } from './lib/supabase'
 import type { AiSummarySettings, Category, Clip, SortMode, SourceSite } from './types'
 import './App.css'
 
@@ -16,52 +19,52 @@ const DEFAULT_AI_SUMMARY_SETTINGS: AiSummarySettings = {
   language: 'ja',
 }
 
-// APIから返されるクリップの生データをアプリ内のClip型に正規化する
-// categoryId / isPinned / comment がサーバー側で管理されているため、そのまま利用する
-function normalizeApiClip(raw: {
-  id: number
-  url: string
-  title: string
-  summary: string
-  rawBody?: string
-  categoryId?: string
-  isPinned?: boolean | number
-  isChecked?: boolean | number
-  comment?: string
-  receivedAt: string
-  deletedAt?: string | null
-  checkedAt?: string | null
-}): Clip {
+// Supabase Edge Functions のベースパス
+const FUNCTIONS_BASE = '/functions/v1'
+
+// Supabase から返されるクリップの生データ（snake_case）をアプリ内の Clip 型に正規化する
+function normalizeApiClip(raw: Record<string, unknown>): Clip {
   return {
-    id: raw.id,
-    url: raw.url,
-    title: raw.title,
-    summary: raw.summary,
-    rawBody: raw.rawBody ?? '',
-    categoryId: raw.categoryId ?? 'others',
-    isPinned: typeof raw.isPinned === 'boolean' ? raw.isPinned : raw.isPinned === 1,
-    isChecked: typeof raw.isChecked === 'boolean' ? raw.isChecked : raw.isChecked === 1,
-    comment: raw.comment ?? '',
-    receivedAt: raw.receivedAt,
-    deletedAt: raw.deletedAt ?? null,
-    checkedAt: raw.checkedAt ?? null,
+    id: Number(raw.id),
+    url: String(raw.url),
+    title: String(raw.title),
+    summary: String(raw.summary ?? ''),
+    rawBody: String(raw.raw_body ?? ''),
+    categoryId: String(raw.category_id ?? 'others'),
+    isPinned: Boolean(raw.is_pinned),
+    isChecked: Boolean(raw.is_checked),
+    comment: String(raw.comment ?? ''),
+    receivedAt: String(raw.received_at),
+    deletedAt: raw.deleted_at ? String(raw.deleted_at) : null,
+    checkedAt: raw.checked_at ? String(raw.checked_at) : null,
   }
 }
 
-// APIから返されるカテゴリの生データをアプリ内のCategory型に正規化する
-function normalizeApiCategory(raw: {
-  id: string
-  name: string
-  icon?: string
-}): Category {
+// Supabase から返されるカテゴリの生データ（snake_case）をアプリ内の Category 型に正規化する
+function normalizeApiCategory(raw: Record<string, unknown>): Category {
   return {
-    id: raw.id,
-    name: raw.name,
-    icon: raw.icon ?? 'grid',
+    id: String(raw.id),
+    name: String(raw.name),
+    icon: String(raw.icon ?? 'grid'),
+  }
+}
+
+// Supabase から返される収集元サイトの生データ（snake_case）を SourceSite 型に正規化する
+function normalizeApiSourceSite(raw: Record<string, unknown>): SourceSite {
+  return {
+    id: Number(raw.id),
+    tag: String(raw.tag),
+    siteUrl: String(raw.site_url),
+    rssUrl: raw.rss_url ? String(raw.rss_url) : null,
+    createdAt: String(raw.created_at),
   }
 }
 
 function App() {
+  // 現在の認証セッション
+  const [session, setSession] = useState<Session | null>(null)
+  // 認証状態の初期確認中フラグ
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true)
   // クリップ一覧の状態（API取得前はモックを表示しておく）
   const [clips, setClips] = useState<Clip[]>(initialClips)
   // ゴミ箱のクリップ一覧の状態
@@ -87,24 +90,72 @@ function App() {
   // 設定ダイアログの表示状態
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState<boolean>(false)
 
+  const supabase = getSupabaseClient()
+
+  // 認証ヘッダーを取得する
+  const getAuthHeaders = useCallback(
+    (contentType = true): Record<string, string> => {
+      const headers: Record<string, string> = {}
+      if (contentType) {
+        headers['Content-Type'] = 'application/json'
+      }
+      const token = session?.access_token
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      return headers
+    },
+    [session],
+  )
+
+  // 認証状態の初期化と変更監視
+  useEffect(() => {
+    let mounted = true
+
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!mounted) return
+      if (error) {
+        console.error('セッション取得失敗:', error)
+      }
+      setSession(data.session)
+      setIsAuthLoading(false)
+    })
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (!mounted) return
+      setSession(newSession)
+    })
+
+    return () => {
+      mounted = false
+      authListener.subscription.unsubscribe()
+    }
+  }, [supabase])
+
   // 収集元サイト一覧を取得する
   const fetchSourceSites = useCallback(async () => {
+    if (!session) return
     try {
-      const response = await fetch('/api/source-site')
+      const response = await fetch(`${FUNCTIONS_BASE}/source-sites`, {
+        headers: getAuthHeaders(false),
+      })
       if (!response.ok) {
         throw new Error(`収集元サイトの取得に失敗しました: ${response.status}`)
       }
       const data = await response.json()
-      setSourceSites(data.sites || [])
+      setSourceSites((data.sites || []).map(normalizeApiSourceSite))
     } catch (err) {
       console.error('収集元サイト取得失敗:', err)
     }
-  }, [])
+  }, [session, getAuthHeaders])
 
   // AI要約設定を取得する
   const fetchAiSummarySettings = useCallback(async () => {
+    if (!session) return
     try {
-      const response = await fetch('/api/settings')
+      const response = await fetch(`${FUNCTIONS_BASE}/settings`, {
+        headers: getAuthHeaders(false),
+      })
       if (!response.ok) {
         throw new Error(`AI要約設定の取得に失敗しました: ${response.status}`)
       }
@@ -119,62 +170,75 @@ function App() {
     } catch (err) {
       console.error('AI要約設定取得失敗:', err)
     }
-  }, [])
+  }, [session, getAuthHeaders])
 
-  // API からカテゴリとクリップを取得する
-  const fetchData = useCallback(async (showLoading = false) => {
-    if (showLoading) setIsLoading(true)
-    try {
-      // AI要約設定も合わせて取得する
-      await fetchAiSummarySettings()
+  // Edge Functions からカテゴリとクリップを取得する
+  const fetchData = useCallback(
+    async (showLoading = false) => {
+      if (!session) return
+      if (showLoading) setIsLoading(true)
+      try {
+        // AI要約設定も合わせて取得する
+        await fetchAiSummarySettings()
 
-      // カテゴリを取得する
-      const categoryResponse = await fetch('/api/category')
-      if (!categoryResponse.ok) {
-        throw new Error(`カテゴリの取得に失敗しました: ${categoryResponse.status}`)
+        // カテゴリを取得する
+        const categoryResponse = await fetch(`${FUNCTIONS_BASE}/categories`, {
+          headers: getAuthHeaders(false),
+        })
+        if (!categoryResponse.ok) {
+          throw new Error(`カテゴリの取得に失敗しました: ${categoryResponse.status}`)
+        }
+        const categoryData = await categoryResponse.json()
+        const apiCategories: Category[] = (categoryData.categories || []).map(normalizeApiCategory)
+        setCategories(apiCategories)
+
+        // クリップを取得する
+        const clipResponse = await fetch(`${FUNCTIONS_BASE}/clips`, {
+          headers: getAuthHeaders(false),
+        })
+        if (!clipResponse.ok) {
+          throw new Error(`クリップの取得に失敗しました: ${clipResponse.status}`)
+        }
+        const clipData = await clipResponse.json()
+        const apiClips: Clip[] = (clipData.clips || []).map(normalizeApiClip)
+        setClips(apiClips)
+
+        // ゴミ箱のクリップを取得する
+        const trashResponse = await fetch(`${FUNCTIONS_BASE}/clips?trash=true`, {
+          headers: getAuthHeaders(false),
+        })
+        if (!trashResponse.ok) {
+          throw new Error(`ゴミ箱の取得に失敗しました: ${trashResponse.status}`)
+        }
+        const trashData = await trashResponse.json()
+        const apiTrashClips: Clip[] = (trashData.clips || []).map(normalizeApiClip)
+        setTrashClips(apiTrashClips)
+
+        // 収集元サイトも合わせて取得する
+        await fetchSourceSites()
+      } catch (err) {
+        console.error('データ取得失敗:', err)
+        // 取得失敗時はモックデータのままにせず、空の状態にしてエラーを分かりやすくする
+        setClips([])
+        setTrashClips([])
+        setCategories(initialCategories)
+      } finally {
+        if (showLoading) setIsLoading(false)
       }
-      const categoryData = await categoryResponse.json()
-      const apiCategories: Category[] = (categoryData.categories || []).map(normalizeApiCategory)
-      setCategories(apiCategories)
+    },
+    [session, getAuthHeaders, fetchAiSummarySettings, fetchSourceSites],
+  )
 
-      // クリップを取得する
-      const clipResponse = await fetch('/api/clip')
-      if (!clipResponse.ok) {
-        throw new Error(`クリップの取得に失敗しました: ${clipResponse.status}`)
-      }
-      const clipData = await clipResponse.json()
-      const apiClips: Clip[] = (clipData.clips || []).map(normalizeApiClip)
-      setClips(apiClips)
-
-      // ゴミ箱のクリップを取得する
-      const trashResponse = await fetch('/api/clip/trash')
-      if (!trashResponse.ok) {
-        throw new Error(`ゴミ箱の取得に失敗しました: ${trashResponse.status}`)
-      }
-      const trashData = await trashResponse.json()
-      const apiTrashClips: Clip[] = (trashData.clips || []).map(normalizeApiClip)
-      setTrashClips(apiTrashClips)
-
-      // 収集元サイトも合わせて取得する
-      await fetchSourceSites()
-    } catch (err) {
-      console.error('データ取得失敗:', err)
-      // 取得失敗時はモックデータのままにせず、空の状態にしてエラーを分かりやすくする
-      setClips([])
-      setTrashClips([])
-      setCategories(initialCategories)
-    } finally {
-      if (showLoading) setIsLoading(false)
-    }
-  }, [fetchSourceSites, fetchAiSummarySettings])
-
-  // 初回表示時にデータを取得する
+  // 認証後またはセッション変更時にデータを取得する
   useEffect(() => {
-    fetchData(true)
-  }, [fetchData])
+    if (session) {
+      fetchData(true)
+    }
+  }, [session, fetchData])
 
   // 定期的に最新のクリップ一覧を取得する（拡張機能からの投稿を反映するため）
   useEffect(() => {
+    if (!session) return
     const intervalId = window.setInterval(() => {
       fetchData(false)
     }, 5000)
@@ -182,7 +246,7 @@ function App() {
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [fetchData])
+  }, [session, fetchData])
 
   // 選択中カテゴリの名称を取得
   const selectedCategoryName = useMemo(() => {
@@ -277,20 +341,20 @@ function App() {
     setSortMode(mode)
   }
 
-  // クリップ情報を API 経由で更新する
+  // クリップ情報を Edge Functions 経由で更新する
   // 成功したらローカル状態も同期する
   const updateClip = async (id: number, updates: Partial<Pick<Clip, 'categoryId' | 'isPinned' | 'isChecked' | 'comment'>>) => {
     try {
-      const response = await fetch(`/api/clip/${id}`, {
+      const response = await fetch(`${FUNCTIONS_BASE}/clips/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(updates),
       })
       if (!response.ok) {
         throw new Error('クリップの更新に失敗しました')
       }
       const data = await response.json()
-      const updatedClip = normalizeApiClip(data.clip)
+      const updatedClip = normalizeApiClip(data.clip as Record<string, unknown>)
       setClips((prev) =>
         prev.map((clip) => (clip.id === id ? updatedClip : clip)),
       )
@@ -308,8 +372,9 @@ function App() {
     if (categoryId === 'trash') {
       // ゴミ箱へ移動
       try {
-        const response = await fetch(`/api/clip/${draggingClipId}/trash`, {
+        const response = await fetch(`${FUNCTIONS_BASE}/clips/${draggingClipId}/trash`, {
           method: 'PATCH',
+          headers: getAuthHeaders(false),
         })
         if (!response.ok) {
           throw new Error('ゴミ箱への移動に失敗しました')
@@ -335,8 +400,9 @@ function App() {
   // ゴミ箱からクリップを復元する
   const handleRestoreClip = async (id: number) => {
     try {
-      const response = await fetch(`/api/clip/${id}/restore`, {
+      const response = await fetch(`${FUNCTIONS_BASE}/clips/${id}/restore`, {
         method: 'PATCH',
+        headers: getAuthHeaders(false),
       })
       if (!response.ok) {
         throw new Error('クリップの復元に失敗しました')
@@ -382,16 +448,16 @@ function App() {
     }
 
     try {
-      const response = await fetch('/api/category', {
+      const response = await fetch(`${FUNCTIONS_BASE}/categories`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(newCategory),
       })
       if (!response.ok) {
         throw new Error('カテゴリの追加に失敗しました')
       }
       const data = await response.json()
-      setCategories((prev) => [...prev, normalizeApiCategory(data.category)])
+      setCategories((prev) => [...prev, normalizeApiCategory(data.category as Record<string, unknown>)])
     } catch (err) {
       console.error('カテゴリ追加失敗:', err)
     }
@@ -408,16 +474,16 @@ function App() {
     if (trimmedName === category.name) return
 
     try {
-      const response = await fetch(`/api/category/${categoryId}`, {
+      const response = await fetch(`${FUNCTIONS_BASE}/categories/${categoryId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ name: trimmedName }),
       })
       if (!response.ok) {
         throw new Error('カテゴリ名の変更に失敗しました')
       }
       const data = await response.json()
-      const updatedCategory = normalizeApiCategory(data.category)
+      const updatedCategory = normalizeApiCategory(data.category as Record<string, unknown>)
       setCategories((prev) =>
         prev.map((cat) => (cat.id === categoryId ? updatedCategory : cat)),
       )
@@ -433,9 +499,9 @@ function App() {
 
   // クリップ収集実行時の処理
   const handleCollectClips = async (params: { tag?: string; keyword?: string; count: number }) => {
-    const response = await fetch('/api/collect', {
+    const response = await fetch(`${FUNCTIONS_BASE}/collect`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(params),
     })
     if (!response.ok) {
@@ -459,7 +525,10 @@ function App() {
     try {
       await Promise.all(
         targets.map((clip) =>
-          fetch(`/api/clip/${clip.id}/trash`, { method: 'PATCH' }),
+          fetch(`${FUNCTIONS_BASE}/clips/${clip.id}/trash`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(false),
+          }),
         ),
       )
       await fetchData(false)
@@ -481,9 +550,9 @@ function App() {
 
   // AI要約設定保存時の処理
   const handleSaveAiSummarySettings = async (settings: AiSummarySettings) => {
-    const response = await fetch('/api/settings', {
+    const response = await fetch(`${FUNCTIONS_BASE}/settings`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({
         aiSummaryEnabled: settings.enabled,
         aiSummaryApiKey: settings.apiKey,
@@ -507,9 +576,9 @@ function App() {
 
   // 収集元サイト追加時の処理
   const handleAddSourceSite = async (site: { tag: string; siteUrl: string }) => {
-    const response = await fetch('/api/source-site', {
+    const response = await fetch(`${FUNCTIONS_BASE}/source-sites`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(site),
     })
     if (!response.ok) {
@@ -521,7 +590,10 @@ function App() {
 
   // 収集元サイト削除時の処理
   const handleDeleteSourceSite = async (id: number) => {
-    const response = await fetch(`/api/source-site/${id}`, { method: 'DELETE' })
+    const response = await fetch(`${FUNCTIONS_BASE}/source-sites/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(false),
+    })
     if (!response.ok) {
       const data = await response.json().catch(() => ({}))
       throw new Error(data.error || 'サイトの削除に失敗しました')
@@ -543,8 +615,9 @@ function App() {
     if (!confirmed) return
 
     try {
-      const response = await fetch(`/api/category/${categoryId}`, {
+      const response = await fetch(`${FUNCTIONS_BASE}/categories/${categoryId}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(false),
       })
       if (!response.ok) {
         throw new Error('カテゴリの削除に失敗しました')
@@ -567,6 +640,22 @@ function App() {
     }
   }
 
+  // ログアウト処理
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut()
+      // 状態をリセットする
+      setClips(initialClips)
+      setTrashClips([])
+      setCategories(initialCategories)
+      setSourceSites([])
+      setSelectedCategoryId('all')
+      setSearchQuery('')
+    } catch (err) {
+      console.error('ログアウト失敗:', err)
+    }
+  }
+
   // ドラッグ開始時の処理
   const handleDragStart = (clipId: number) => {
     setDraggingClipId(clipId)
@@ -575,6 +664,23 @@ function App() {
   // ドラッグ終了時の処理
   const handleDragEnd = () => {
     setDraggingClipId(null)
+  }
+
+  // 未認証時はログイン画面を表示する
+  if (isAuthLoading) {
+    return (
+      <div className="app-layout auth-loading">
+        <p>認証状態を確認中…</p>
+      </div>
+    )
+  }
+
+  if (!session) {
+    return (
+      <div className="app-layout auth-layout">
+        <AuthPanel onAuthChange={() => fetchData(true)} />
+      </div>
+    )
   }
 
   return (
@@ -673,6 +779,13 @@ function App() {
               />
             </>
           )}
+        </div>
+
+        {/* ログアウトボタン */}
+        <div className="logout-area">
+          <button type="button" className="button-secondary" onClick={handleLogout}>
+            ログアウト
+          </button>
         </div>
       </main>
     </div>
