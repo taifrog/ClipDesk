@@ -396,6 +396,34 @@ function App() {
     await fetchData(false)
   }
 
+  // 掃除：チェック済み・ピン留めなしのクリップをゴミ箱に移動する
+  const handleCleanupClips = async () => {
+    const targets = clips.filter((clip) => clip.isChecked && !clip.isPinned)
+    if (targets.length === 0) return
+
+    const confirmed = window.confirm(
+      `チェック済みのクリップ ${targets.length}件をゴミ箱に移動しますか？`,
+    )
+    if (!confirmed) return
+
+    try {
+      await Promise.all(
+        targets.map((clip) =>
+          fetch(`/api/clip/${clip.id}/trash`, { method: 'PATCH' }),
+        ),
+      )
+      await fetchData(false)
+    } catch (err) {
+      console.error('掃除失敗:', err)
+    }
+  }
+
+  // 掃除対象のクリップ件数
+  const cleanupCount = useMemo(
+    () => clips.filter((clip) => clip.isChecked && !clip.isPinned).length,
+    [clips],
+  )
+
   // 設定ボタン押下時の処理
   const handleOpenSettings = () => {
     setIsSettingsDialogOpen(true)
@@ -507,10 +535,12 @@ function App() {
         selectedCategoryId={selectedCategoryId}
         draggingClipId={draggingClipId}
         trashCount={trashClips.length}
+        cleanupCount={cleanupCount}
         onSelectCategory={handleSelectCategory}
         onDropToCategory={handleDropToCategory}
         onAddCategory={handleAddCategory}
         onCollectClips={handleOpenCollectDialog}
+        onCleanupClips={handleCleanupClips}
         onOpenSettings={handleOpenSettings}
         onRenameCategory={handleRenameCategory}
         onDeleteCategory={handleDeleteCategory}

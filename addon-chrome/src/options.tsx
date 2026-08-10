@@ -1,5 +1,5 @@
 // オプション画面
-// APIキー、投稿先URL、モデル、要約言語などの設定を管理する
+// 投稿先URLなどの設定を管理する
 
 import { useEffect, useState } from 'react';
 import { loadSettings, saveSettings } from './storage';
@@ -47,19 +47,6 @@ function Options() {
       <form onSubmit={handleSubmit}>
         <div style={{ marginBottom: 16 }}>
           <label style={{ display: 'block', marginBottom: 4, fontWeight: 'bold' }}>
-            OpenCode Go APIキー
-          </label>
-          <input
-            type="password"
-            value={settings.apiKey}
-            onChange={(e) => handleChange('apiKey', e.target.value)}
-            style={{ width: '100%', padding: 8, fontSize: 14 }}
-            placeholder="sk-..."
-          />
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 4, fontWeight: 'bold' }}>
             投稿先 ClipDesk URL
           </label>
           <input
@@ -69,32 +56,9 @@ function Options() {
             style={{ width: '100%', padding: 8, fontSize: 14 }}
             placeholder="http://localhost:3001/api/clip"
           />
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 4, fontWeight: 'bold' }}>
-            使用モデル
-          </label>
-          <input
-            type="text"
-            value={settings.model}
-            onChange={(e) => handleChange('model', e.target.value)}
-            style={{ width: '100%', padding: 8, fontSize: 14 }}
-            placeholder="gpt-4o-mini"
-          />
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 4, fontWeight: 'bold' }}>
-            要約の言語
-          </label>
-          <input
-            type="text"
-            value={settings.language}
-            onChange={(e) => handleChange('language', e.target.value)}
-            style={{ width: '100%', padding: 8, fontSize: 14 }}
-            placeholder="ja"
-          />
+          <p style={{ margin: '4px 0 0', fontSize: 12, color: '#666' }}>
+            要約は ClipDesk サイト側の設定で行われます。
+          </p>
         </div>
 
         <button type="submit" style={{ padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}>

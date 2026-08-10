@@ -43,11 +43,6 @@ function Popup() {
     }
   }
 
-  // オプション画面を開く
-  function openOptions() {
-    chrome.runtime.openOptionsPage();
-  }
-
   return (
     <div style={{ width: 320, padding: 16, fontFamily: 'system-ui, sans-serif' }}>
       <h1 style={{ margin: '0 0 12px', fontSize: 18 }}>ClipDesk</h1>
@@ -61,19 +56,13 @@ function Popup() {
         <p style={{ fontSize: 12, color: '#888' }}>読み込み中…</p>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+      <div style={{ marginBottom: 12 }}>
         <button
           onClick={handleCreateClip}
           disabled={loading || !page}
-          style={{ flex: 1, padding: '8px 12px', fontSize: 14, cursor: 'pointer' }}
+          style={{ width: '100%', padding: '8px 12px', fontSize: 14, cursor: 'pointer' }}
         >
           {loading ? '投稿中…' : 'クリップを作成'}
-        </button>
-        <button
-          onClick={openOptions}
-          style={{ padding: '8px 12px', fontSize: 14, cursor: 'pointer' }}
-        >
-          設定
         </button>
       </div>
 

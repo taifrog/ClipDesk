@@ -1,5 +1,5 @@
 // Service Worker（background script）
-// タブ情報の取得、AI要約、ClipDeskへの投稿を制御する
+// タブ情報の取得、ClipDeskへの投稿を制御する
 
 import type { ClipPayload, ExtensionMessage, ExtensionSettings, PageInfo } from './types';
 import { loadSettings } from './storage';
@@ -49,50 +49,6 @@ async function getActivePageInfo(): Promise<PageInfo> {
   }
 }
 
-// 本文を指定文字数に制限する
-function truncateBody(text: string, maxChars: number): string {
-  if (text.length <= maxChars) {
-    return text;
-  }
-  return text.slice(0, maxChars) + '\n…（以下省略）';
-}
-
-// OpenCode Go でページ本文を要約する
-async function summarizePage(info: PageInfo, settings: ExtensionSettings): Promise<string> {
-  const bodyText = truncateBody(info.body, 4000);
-  const prompt = `以下のWebページを「${settings.language === 'ja' ? '日本語' : settings.language}」で簡潔に要約してください。\n\nタイトル: ${info.title}\nURL: ${info.url}\n\n本文:\n${bodyText}`;
-
-  const response = await fetch('https://opencode.ai/zen/go/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${settings.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: settings.model,
-      messages: [
-        { role: 'system', content: 'あなたはWebページの内容を要約するアシスタントです。' },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.5,
-      max_tokens: 500,
-      stream: false,
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    throw new Error(`AI APIの呼び出しに失敗しました: ${response.status} ${text}`);
-  }
-
-  const data = await response.json();
-  if (!data.choices || data.choices.length === 0) {
-    throw new Error('AIからの応答が空です');
-  }
-
-  return data.choices[0].message.content as string;
-}
-
 // ClipDesk ローカルサイトにクリップを投稿する
 async function postToClipDesk(payload: ClipPayload, localSiteUrl: string): Promise<void> {
   const response = await fetch(localSiteUrl, {
@@ -108,25 +64,23 @@ async function postToClipDesk(payload: ClipPayload, localSiteUrl: string): Promi
 }
 
 // クリップ作成の一連の処理を実行する
-// ページ情報取得 → AI要約 → ローカルサイトへの投稿
+// ページ情報取得 → ローカルサイトへの投稿（要約はサイト側で行う）
 async function createClip(): Promise<{ ok: true; payload: ClipPayload } | { ok: false; error: string }> {
   try {
     const settings = await getSettings();
-    if (!settings.apiKey) {
-      return { ok: false, error: 'APIキーが設定されていません。オプション画面から設定してください。' };
-    }
     if (!settings.localSiteUrl) {
       return { ok: false, error: '投稿先URLが設定されていません。オプション画面から設定してください。' };
     }
 
     const info = await getActivePageInfo();
-    const summary = await summarizePage(info, settings);
     const payload: ClipPayload = {
       url: info.url,
       title: info.title,
-      summary,
+      summary: '',
       rawBody: info.body,
     };
+
+    debug(`送信ペイロード: rawBody=${payload.rawBody ? payload.rawBody.length : 0}文字, title=${payload.title.slice(0, 50)}`);
 
     await postToClipDesk(payload, settings.localSiteUrl);
     return { ok: true, payload };

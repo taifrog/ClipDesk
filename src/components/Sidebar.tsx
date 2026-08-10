@@ -8,10 +8,12 @@ interface SidebarProps {
   selectedCategoryId: string
   draggingClipId: number | null
   trashCount: number
+  cleanupCount: number
   onSelectCategory: (categoryId: string) => void
   onDropToCategory: (categoryId: string) => void
   onAddCategory: () => void
   onCollectClips: () => void
+  onCleanupClips: () => void
   onOpenSettings: () => void
   onRenameCategory?: (categoryId: string) => void
   onDeleteCategory?: (categoryId: string) => void
@@ -39,6 +41,7 @@ function Icon({ name }: { name: string }) {
       'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84a.484.484 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.488.488 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.27.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z',
     plus: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
     pin: 'M16 12V4h1V2H7v2h1v8l-3 3v2h5v6h2v-6h5v-2l-3-3z',
+    broom: 'M19.36 2.64l1.41 1.41-5.66 5.66c.56.83.89 1.83.89 2.9 0 1.38-.56 2.63-1.46 3.54l-1.42-1.42c.56-.56.89-1.33.89-2.12 0-.79-.32-1.56-.88-2.12L19.36 2.64M15.06 9.94l-7.07 7.07L5.64 15.71l7.07-7.07 2.35 2.3zm-6.36 9.36L3 22l-1-1 5.64-5.64 1.42 1.42-.36.36z',
     trash: 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM8 9h8v10H8V9zm7.5-5l-1-1h-5l-1 1H5v2h14V4h-3.5z',
   }
 
@@ -101,10 +104,12 @@ export function Sidebar({
   selectedCategoryId,
   draggingClipId,
   trashCount,
+  cleanupCount,
   onSelectCategory,
   onDropToCategory,
   onAddCategory,
   onCollectClips,
+  onCleanupClips,
   onOpenSettings,
   onRenameCategory,
   onDeleteCategory,
@@ -114,6 +119,10 @@ export function Sidebar({
     if (categoryId === 'all') return clips.length
     return clips.filter((clip) => clip.categoryId === categoryId).length
   }
+
+  // すべてのクリップ / ゴミ箱 / カテゴリを分離する
+  const allCategory = categories.find((c) => c.id === 'all')
+  const normalCategories = categories.filter((c) => c.id !== 'all')
 
   // 表示中のコンテキストメニュー情報
   const [contextMenu, setContextMenu] = useState<{
@@ -165,14 +174,67 @@ export function Sidebar({
         <span>クリップ収集</span>
       </button>
 
-      {/* カテゴリ一覧 */}
+      {/* 掃除ボタン：チェック済み・ピン留めなしのクリップをゴミ箱へ移動する */}
+      <button
+        type="button"
+        className="cleanup-button"
+        onClick={onCleanupClips}
+        disabled={cleanupCount === 0}
+        title={cleanupCount === 0 ? '掃除対象のクリップがありません' : `${cleanupCount}件のクリップをゴミ箱に移動します`}
+      >
+        <Icon name="broom" />
+        <span>掃除</span>
+        {cleanupCount > 0 && <span className="cleanup-count">{cleanupCount}</span>}
+      </button>
+
+      {/* ナビゲーション */}
       <nav className="sidebar-nav" aria-label="カテゴリ">
+        {/* すべてのクリップ */}
+        {allCategory && (
+          <ul className="category-list">
+            <li>
+              <button
+                type="button"
+                className={`category-item ${selectedCategoryId === 'all' ? 'active' : ''}`}
+                onClick={() => onSelectCategory('all')}
+              >
+                <span className="category-icon">
+                  <Icon name={allCategory.icon} />
+                </span>
+                <span className="category-name">{allCategory.name}</span>
+                <span className="category-count">{clips.length}</span>
+              </button>
+            </li>
+          </ul>
+        )}
+
+        {/* ゴミ箱 */}
+        <button
+          type="button"
+          className={`category-item trash-item ${isTrashActive ? 'active' : ''} ${isTrashDragTarget ? 'droppable' : ''}`}
+          onClick={() => onSelectCategory('trash')}
+          onDragOver={(e) => {
+            // ドロップを許可する
+            e.preventDefault()
+          }}
+          onDrop={(e) => {
+            e.preventDefault()
+            onDropToCategory('trash')
+          }}
+        >
+          <span className="category-icon">
+            <Icon name="trash" />
+          </span>
+          <span className="category-name">ゴミ箱</span>
+          <span className="category-count">{trashCount}</span>
+        </button>
+
+        {/* カテゴリ一覧 */}
         <div className="sidebar-section-label">カテゴリ</div>
         <ul className="category-list">
-          {categories.map((category) => {
+          {normalCategories.map((category) => {
             const isActive = category.id === selectedCategoryId
-            const isDragOverTarget =
-              draggingClipId !== null && category.id !== 'all'
+            const isDragOverTarget = draggingClipId !== null
 
             return (
               <li key={category.id}>
@@ -183,15 +245,11 @@ export function Sidebar({
                   onContextMenu={(e) => handleContextMenu(e, category)}
                   onDragOver={(e) => {
                     // ドロップを許可する（デフォルトは拒否される）
-                    if (category.id !== 'all') {
-                      e.preventDefault()
-                    }
+                    e.preventDefault()
                   }}
                   onDrop={(e) => {
                     e.preventDefault()
-                    if (category.id !== 'all') {
-                      onDropToCategory(category.id)
-                    }
+                    onDropToCategory(category.id)
                   }}
                 >
                   <span className="category-icon">
@@ -210,27 +268,6 @@ export function Sidebar({
       <button type="button" className="add-category-button" onClick={onAddCategory}>
         <Icon name="plus" />
         <span>カテゴリを追加</span>
-      </button>
-
-      {/* ゴミ箱 */}
-      <button
-        type="button"
-        className={`category-item trash-item ${isTrashActive ? 'active' : ''} ${isTrashDragTarget ? 'droppable' : ''}`}
-        onClick={() => onSelectCategory('trash')}
-        onDragOver={(e) => {
-          // ドロップを許可する
-          e.preventDefault()
-        }}
-        onDrop={(e) => {
-          e.preventDefault()
-          onDropToCategory('trash')
-        }}
-      >
-        <span className="category-icon">
-          <Icon name="trash" />
-        </span>
-        <span className="category-name">ゴミ箱</span>
-        <span className="category-count">{trashCount}</span>
       </button>
 
       {/* 設定 */}

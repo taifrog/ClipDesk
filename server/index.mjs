@@ -132,16 +132,34 @@ function getAppSettings() {
     aiSummaryModel: 'gpt-4o-mini',
     aiSummaryLanguage: 'ja',
   };
+
+  // 利用できなくなったモデル名が保存されている場合はデフォルトに戻す
+  const supportedModels = new Set([
+    'gpt-4o-mini',
+    'gpt-4o',
+    'gpt-3.5-turbo',
+    'claude-3-haiku',
+    'claude-3-sonnet',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
+  ]);
   const settings = { ...defaults };
   const selectStmt = db.prepare(`SELECT key, value FROM app_settings WHERE key IN (${keys.map(() => '?').join(',')})`);
   const rows = selectStmt.all(...keys);
   for (const row of rows) {
     settings[row.key] = row.value;
   }
+
+  // 保存されているモデル名がサポート対象外の場合はデフォルトに戻す
+  const model = supportedModels.has(settings.aiSummaryModel) ? settings.aiSummaryModel : defaults.aiSummaryModel;
+  if (model !== settings.aiSummaryModel) {
+    debugLog('未対応モデル検出', `${settings.aiSummaryModel} -> ${model}`);
+  }
+
   return {
     enabled: settings.aiSummaryEnabled === 'true',
     apiKey: settings.aiSummaryApiKey,
-    model: settings.aiSummaryModel,
+    model,
     language: settings.aiSummaryLanguage,
   };
 }
@@ -164,12 +182,23 @@ function truncateText(text, maxChars) {
 }
 
 // OpenCode Go でテキストを要約する
+// @param text 要約対象の本文
+// @param title Webページのタイトル
+// @param settings AI要約設定（enabled, apiKey, model, language）
+// @returns 要約文字列
 async function summarizeWithOpenCodeGo(text, title, settings) {
   if (!settings.apiKey) {
     throw new Error('OpenCode Go APIキーが設定されていません');
   }
   const bodyText = truncateText(text, 4000);
   const prompt = `以下のWebページを「${settings.language === 'ja' ? '日本語' : settings.language}」で簡潔に要約してください。\n\nタイトル: ${title}\n\n本文:\n${bodyText}`;
+
+  debugLog('AI要約APIリクエスト', {
+    model: settings.model,
+    language: settings.language,
+    bodyLength: bodyText.length,
+    title: title.slice(0, 100),
+  });
 
   const response = await fetch('https://opencode.ai/zen/go/v1/chat/completions', {
     method: 'POST',
@@ -191,14 +220,18 @@ async function summarizeWithOpenCodeGo(text, title, settings) {
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '');
+    debugLog('AI要約APIエラー', `${response.status} ${errorText.slice(0, 200)}`);
     throw new Error(`AI APIの呼び出しに失敗しました: ${response.status} ${errorText}`);
   }
 
   const data = await response.json();
   if (!data.choices || data.choices.length === 0) {
+    debugLog('AI要約API空応答', JSON.stringify(data).slice(0, 200));
     throw new Error('AIからの応答が空です');
   }
-  return String(data.choices[0].message.content || '').trim();
+  const summary = String(data.choices[0].message.content || '').trim();
+  debugLog('AI要約API成功', `要約長: ${summary.length}文字`);
+  return summary;
 }
 
 // URLからHTML/XMLテキストを取得する
@@ -365,16 +398,50 @@ app.use(cors());
 app.use(express.json());
 
 // クリップを受け取るエンドポイント
-app.post('/api/clip', (req, res) => {
+// アドオンからは要約なしで送信され、サイト側の設定に応じて AI 要約を実行する
+app.post('/api/clip', async (req, res) => {
   const body = req.body || {};
   const { url, title, summary, rawBody } = body;
   if (!url || !title) {
     return res.status(400).json({ error: 'url と title は必須です', receivedBody: body });
   }
+
+  // 送信された summary が空で、rawBody があればサイト側で AI 要約を行う
+  let finalSummary = summary || '';
+  let aiSummaryError = null;
+  const aiSettings = getAppSettings();
+
+  debugLog('クリップ受信判定', {
+    url,
+    hasSummary: Boolean(finalSummary),
+    summaryLength: finalSummary.length,
+    hasRawBody: Boolean(rawBody),
+    rawBodyLength: rawBody ? rawBody.length : 0,
+    aiEnabled: aiSettings.enabled,
+    hasApiKey: Boolean(aiSettings.apiKey),
+    model: aiSettings.model,
+    language: aiSettings.language,
+  });
+
+  if (!finalSummary && rawBody && aiSettings.enabled && aiSettings.apiKey) {
+    try {
+      const aiSummary = await summarizeWithOpenCodeGo(rawBody, title, aiSettings);
+      if (aiSummary) finalSummary = aiSummary;
+    } catch (err) {
+      aiSummaryError = err.message || '不明なエラー';
+      debugLog('AI要約失敗（クリップ受信）', `${url}: ${aiSummaryError}`);
+      // 要約に失敗してもクリップ登録は続行する
+    }
+  } else {
+    debugLog('AI要約スキップ', {
+      reason: finalSummary ? 'summaryあり' : !rawBody ? 'rawBodyなし' : !aiSettings.enabled ? 'AI要約無効' : 'APIキー未設定',
+    });
+  }
+
   const clip = {
     url,
     title,
-    summary: summary || '',
+    summary: finalSummary,
     rawBody: rawBody || '',
     categoryId: 'others',
     isPinned: 0,
@@ -387,8 +454,8 @@ app.post('/api/clip', (req, res) => {
     VALUES (@url, @title, @summary, @rawBody, @categoryId, @isPinned, @isChecked, @comment, @receivedAt)
   `);
   const result = insertStmt.run(clip);
-  debugLog('クリップ受信', title);
-  res.status(201).json({ ok: true, clip: { id: result.lastInsertRowid, ...clip } });
+  debugLog('クリップ登録', { title, summaryLength: finalSummary.length });
+  res.status(201).json({ ok: true, clip: { id: result.lastInsertRowid, ...clip }, aiSummaryError });
 });
 
 // クリップ一覧

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ClipDesk",
-  "description": "アクティブなページのタイトル、URL、本文をAIで要約してClipDeskへ投稿します",
+  "description": "アクティブなページのタイトル、URL、本文をClipDeskへ投稿します（要約はサイト側で行います）",
   "version": "0.1.0",
   "permissions": [
     "activeTab",
