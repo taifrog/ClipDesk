@@ -121,7 +121,8 @@ export function Sidebar({
   }
 
   // すべてのクリップ / ゴミ箱 / カテゴリを分離する
-  const allCategory = categories.find((c) => c.id === 'all')
+  // all / others は含まれていなくても必ず表示できるようデフォルト値を用意する
+  const allCategory = categories.find((c) => c.id === 'all') ?? { id: 'all', name: 'すべてのクリップ', icon: 'inbox' }
   const normalCategories = categories.filter((c) => c.id !== 'all')
 
   // 表示中のコンテキストメニュー情報

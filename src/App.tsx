@@ -43,13 +43,38 @@ function normalizeApiClip(raw: Record<string, unknown>): Clip {
   }
 }
 
-// Supabase から返されるカテゴリの生データ（snake_case）をアプリ内の Category 型に正規化する
+  // Supabase から返されるカテゴリの生データ（snake_case）をアプリ内の Category 型に正規化する
 function normalizeApiCategory(raw: Record<string, unknown>): Category {
   return {
     id: String(raw.id),
     name: String(raw.name),
     icon: String(raw.icon ?? 'grid'),
   }
+}
+
+// 論理カテゴリの定義（DB に依存せずフロントエンド側で常に表示する）
+// all: すべてのクリップを表示する仮想カテゴリ
+// others: どのカテゴリにも属さないクリップを表示するカテゴリ
+const LOGICAL_CATEGORIES: Category[] = [
+  { id: 'all', name: 'すべてのクリップ', icon: 'inbox' },
+  { id: 'others', name: 'その他', icon: 'grid' },
+]
+
+// API から取得したカテゴリ一覧に論理カテゴリが含まれていない場合に補完する
+// ユーザーの既存データを優先しつつ、all / others は必ず存在させる
+function ensureLogicalCategories(categories: Category[]): Category[] {
+  const result = [...categories]
+  for (const logical of LOGICAL_CATEGORIES) {
+    if (!result.some((cat) => cat.id === logical.id)) {
+      // all は先頭に、others は末尾に追加する
+      if (logical.id === 'all') {
+        result.unshift(logical)
+      } else {
+        result.push(logical)
+      }
+    }
+  }
+  return result
 }
 
 // Supabase から返される収集元サイトの生データ（snake_case）を SourceSite 型に正規化する
@@ -276,7 +301,7 @@ function App() {
         }
         const categoryData = await categoryResponse.json()
         const apiCategories: Category[] = (categoryData.categories || []).map(normalizeApiCategory)
-        setCategories(apiCategories)
+        setCategories(ensureLogicalCategories(apiCategories))
 
         // クリップを取得する
         const clipResponse = await fetch(`${FUNCTIONS_BASE}/clips`, {
