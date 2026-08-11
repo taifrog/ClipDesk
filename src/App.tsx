@@ -19,8 +19,12 @@ const DEFAULT_AI_SUMMARY_SETTINGS: AiSummarySettings = {
   language: 'ja',
 }
 
-// Supabase Edge Functions のベースパス
-const FUNCTIONS_BASE = '/functions/v1'
+// Supabase Edge Functions のベースパスを環境に応じて決定する
+// ローカル開発時は Vite のプロキシで /functions/v1 が localhost:54321 に転送されるため相対パスを使用
+// 本番（GitHub Pages など）では VITE_SUPABASE_URL を基に絶対 URL を構築する
+const FUNCTIONS_BASE = import.meta.env.DEV
+  ? '/functions/v1'
+  : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 
 // Supabase から返されるクリップの生データ（snake_case）をアプリ内の Clip 型に正規化する
 function normalizeApiClip(raw: Record<string, unknown>): Clip {

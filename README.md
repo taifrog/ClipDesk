@@ -7,7 +7,8 @@
 - React 19
 - TypeScript
 - Vite
-- Supabase（Postgres / Auth / Edge Functions / Hosting）
+- Supabase（Postgres / Auth / Edge Functions）
+- GitHub Pages（フロントエンドホスティング）
 
 > **Note:** 旧 Express + better-sqlite3 バックエンドは非推奨です。新規機能は Supabase Edge Functions として実装されています。`server/` 以下はローカル開発や旧データ参照のために残されています。
 
@@ -88,7 +89,7 @@ npm run build
 
 拡張機能アイコンを右クリック →「オプション」から、以下を設定してください。
 
-- **ClipDesk サイト URL**: `https://your-project.supabase.co`（ローカル開発時は `http://localhost:5173`）
+- **ClipDesk サイト URL**: `https://taifrog.github.io/ClipDesk/`（ローカル開発時は `http://localhost:5173`）
 - **API キー**: ClipDesk サイトの「設定」→「拡張機能 API キー」で発行したキー
 
 ### 8. クリップを投稿する
@@ -117,7 +118,7 @@ npm run build
   - `settings` — AI 要約設定
   - `collect` — RSS/スクレイピングによる記事収集
   - `user-api-keys` — Chrome 拡張機能用 API キー管理
-- **Hosting**: `npm run build` で生成された `dist/` をデプロイ
+- **Hosting（フロントエンド）**: GitHub Pages で `docs/` フォルダを公開
 
 ## ブラウザ拡張機能（addon-chrome）
 
@@ -148,7 +149,7 @@ npm run build
 
 拡張機能アイコンを右クリック →「オプション」から、以下を設定してください。
 
-- **ClipDesk サイト URL**: Supabase プロジェクトの URL またはローカル開発サーバーの URL
+- **ClipDesk サイト URL**: `https://taifrog.github.io/ClipDesk/` またはローカル開発サーバーの URL
 - **API キー**: ClipDesk サイトの「設定」→「拡張機能 API キー」で発行したキー
 
 ## CI / CD（GitHub Actions）
@@ -156,9 +157,10 @@ npm run build
 `.github/workflows/deploy.yml` で、main ブランチへの push 時に以下を自動実行します。
 
 1. フロントエンドをビルド（`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` を Secrets から注入）
-2. Supabase Hosting へ `dist/` をデプロイ
-3. データベースマイグレーションを適用（`supabase db push`）
-4. Edge Functions をデプロイ（`supabase functions deploy`）
+2. ビルド成果物を `docs/` に出力し、main ブランチへコミット・プッシュ（GitHub Pages 公開用）
+3. SPA フォールバック用の `404.html` を作成
+4. データベースマイグレーションを適用（`supabase db push`）
+5. Edge Functions をデプロイ（`supabase functions deploy`）
 
 ### 必要な GitHub Secrets
 
@@ -170,7 +172,16 @@ npm run build
 | `SUPABASE_PROJECT_ID` | Supabase プロジェクト参照 ID（例：`xxxxxxxxxxxxxxxxxxxx`）|
 | `SUPABASE_DB_PASSWORD` | 本番 DB のパスワード |
 
-手動実行も可能です。GitHub リポジトリの「Actions」→「Deploy to Supabase」→「Run workflow」から実行してください。
+手動実行も可能です。GitHub リポジトリの「Actions」→「Deploy to GitHub Pages and Supabase」→「Run workflow」から実行してください。
+
+## GitHub Pages 公開手順
+
+1. GitHub リポジトリの「Settings」→「Pages」を開く
+2. 「Source」で「Deploy from a branch」を選択
+3. 「Branch」で「main」、「Folder」で「/docs」を選択して保存
+4. 数分後に `https://taifrog.github.io/ClipDesk/` でアクセス可能になる
+
+> **Note:** リポジトリ名やオーナー名が異なる場合は、URL を適宜読み替えてください。また、`vite.config.ts` の `base` もリポジトリ名と一致するように調整してください。
 
 ## ローカル開発時の Vite プロキシ
 
