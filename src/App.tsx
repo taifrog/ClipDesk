@@ -668,7 +668,8 @@ function App() {
     const response = await fetch(`${FUNCTIONS_BASE}/source-sites`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify(site),
+      // バックエンドは snake_case の site_url を期待しているため変換する
+      body: JSON.stringify({ tag: site.tag, site_url: site.siteUrl }),
     })
     if (!response.ok) {
       const data = await response.json().catch(() => ({}))
