@@ -5,10 +5,10 @@ import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-
 
 // 環境変数から Supabase URL と service_role キーを取得する
 export function getServiceClient(): SupabaseClient {
-  const url = Deno.env.get('SUPABASE_URL');
-  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const url = Deno.env.get('SB_URL');
+  const key = Deno.env.get('SB_SERVICE_ROLE_KEY');
   if (!url || !key) {
-    throw new Error('SUPABASE_URL または SUPABASE_SERVICE_ROLE_KEY が設定されていません');
+    throw new Error('SB_URL または SB_SERVICE_ROLE_KEY が設定されていません');
   }
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -18,10 +18,10 @@ export function getServiceClient(): SupabaseClient {
 // リクエストヘッダーから anon キーで認証済みユーザーのクライアントを生成する
 // フロントエンドからの認証リクエスト用
 export function getUserClient(req: Request): SupabaseClient {
-  const url = Deno.env.get('SUPABASE_URL');
-  const key = Deno.env.get('SUPABASE_ANON_KEY');
+  const url = Deno.env.get('SB_URL');
+  const key = Deno.env.get('SB_ANON_KEY');
   if (!url || !key) {
-    throw new Error('SUPABASE_URL または SUPABASE_ANON_KEY が設定されていません');
+    throw new Error('SB_URL または SB_ANON_KEY が設定されていません');
   }
   const authHeader = req.headers.get('authorization') || req.headers.get('Authorization') || '';
   return createClient(url, key, {

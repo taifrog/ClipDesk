@@ -82,7 +82,7 @@ jobs:
           supabase db push
 
       # Edge Functions から利用する環境変数を登録する
-      # SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY を設定
+      # SUPABASE_ プレフィックスは予約語のため SB_ プレフィックスを使用する
       - name: Edge Functions 用 Secrets を設定
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -91,9 +91,9 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           supabase secrets set --project-ref "$SUPABASE_PROJECT_ID" \
-            SUPABASE_URL="https://${SUPABASE_PROJECT_ID}.supabase.co" \
-            SUPABASE_ANON_KEY="$VITE_SUPABASE_ANON_KEY" \
-            SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY"
+            SB_URL="https://${SUPABASE_PROJECT_ID}.supabase.co" \
+            SB_ANON_KEY="$VITE_SUPABASE_ANON_KEY" \
+            SB_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY"
 
       # Edge Functions をデプロイ
       - name: Edge Functions をデプロイ
