@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
       });
     }
     if ((count || 0) >= 5) {
-      return new Response(JSON.stringify({ error: '同じタグには最大5件までしか登録できません' }), {
+      return new Response(JSON.stringify({ error: '同じタグには最大5件までしか登録できません', code: 'TAG_LIMIT_EXCEEDED' }), {
         status: 409,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -106,8 +106,12 @@ Deno.serve(async (req) => {
       .select()
       .single();
     if (error) {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: error.code === '23505' ? 409 : 500,
+      const isDuplicate = error.code === '23505';
+      return new Response(JSON.stringify({
+        error: isDuplicate ? '同じURLのサイトは既に登録されています' : error.message,
+        code: isDuplicate ? 'DUPLICATE_SITE_URL' : undefined,
+      }), {
+        status: isDuplicate ? 409 : 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

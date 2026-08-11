@@ -6,7 +6,6 @@ import { Header } from './components/Header'
 import { SettingsDialog } from './components/SettingsDialog'
 import { Sidebar } from './components/Sidebar'
 import { AuthPanel } from './components/AuthPanel'
-import { initialCategories, initialClips } from './data/mock'
 import { getSupabaseClient } from './lib/supabase'
 import type { AiSummarySettings, Category, Clip, SortMode, SourceSite, UserApiKey } from './types'
 import './App.css'
@@ -69,12 +68,12 @@ function App() {
   const [session, setSession] = useState<Session | null>(null)
   // 認証状態の初期確認中フラグ
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true)
-  // クリップ一覧の状態（API取得前はモックを表示しておく）
-  const [clips, setClips] = useState<Clip[]>(initialClips)
+  // クリップ一覧の状態（API取得前は空配列でモックを表示しない）
+  const [clips, setClips] = useState<Clip[]>([])
   // ゴミ箱のクリップ一覧の状態
   const [trashClips, setTrashClips] = useState<Clip[]>([])
   // カテゴリ一覧の状態
-  const [categories, setCategories] = useState<Category[]>(initialCategories)
+  const [categories, setCategories] = useState<Category[]>([])
   // 選択中のカテゴリID
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all')
   // ドラッグ中のクリップID
@@ -308,7 +307,7 @@ function App() {
         // 取得失敗時はモックデータのままにせず、空の状態にしてエラーを分かりやすくする
         setClips([])
         setTrashClips([])
-        setCategories(initialCategories)
+        setCategories([])
       } finally {
         if (showLoading) setIsLoading(false)
       }
@@ -324,8 +323,11 @@ function App() {
   }, [session, fetchData])
 
   // 定期的に最新のクリップ一覧を取得する（拡張機能からの投稿を反映するため）
+  // 設定ダイアログや収集ダイアログを開いている間は停止し、操作との競合を防ぐ
   useEffect(() => {
     if (!session) return
+    if (isSettingsDialogOpen || isCollectDialogOpen) return
+
     const intervalId = window.setInterval(() => {
       fetchData(false)
     }, 5000)
@@ -333,7 +335,7 @@ function App() {
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [session, fetchData])
+  }, [session, fetchData, isSettingsDialogOpen, isCollectDialogOpen])
 
   // 選択中カテゴリの名称を取得
   const selectedCategoryName = useMemo(() => {
@@ -732,9 +734,9 @@ function App() {
     try {
       await supabase.auth.signOut()
       // 状態をリセットする
-      setClips(initialClips)
+      setClips([])
       setTrashClips([])
-      setCategories(initialCategories)
+      setCategories([])
       setSourceSites([])
       setSelectedCategoryId('all')
       setSearchQuery('')

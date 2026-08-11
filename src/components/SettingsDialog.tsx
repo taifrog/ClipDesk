@@ -174,7 +174,14 @@ export function SettingsDialog({
       setTag('')
       setSiteUrl('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'サイトの追加に失敗しました')
+      let message = err instanceof Error ? err.message : 'サイトの追加に失敗しました'
+      // API から返却されたエラーコードに応じて、より分かりやすいメッセージに置き換える
+      if (err instanceof Error && err.message.includes('DUPLICATE_SITE_URL')) {
+        message = '同じURLのサイトは既に登録されています'
+      } else if (err instanceof Error && err.message.includes('TAG_LIMIT_EXCEEDED')) {
+        message = '同じタグには最大5件までしか登録できません'
+      }
+      setError(message)
     } finally {
       setIsSubmitting(false)
     }
