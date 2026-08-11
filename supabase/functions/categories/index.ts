@@ -21,8 +21,10 @@ Deno.serve(async (req) => {
     });
   }
 
-  const supabase = getServiceClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser(jwt);
+  // JWT 検証用と DB 操作用で service_role クライアントを分離する
+  // auth.getUser() 呼び出し後も RLS をバイパスし続けるため
+  const authClient = getServiceClient();
+  const { data: userData, error: userError } = await authClient.auth.getUser(jwt);
   if (userError || !userData.user) {
     return new Response(JSON.stringify({ error: '認証に失敗しました' }), {
       status: 401,
@@ -32,6 +34,7 @@ Deno.serve(async (req) => {
   const userId = userData.user.id;
 
   const url = new URL(req.url);
+  const supabase = getServiceClient();
 
   // GET /categories 一覧
   if (req.method === 'GET') {
