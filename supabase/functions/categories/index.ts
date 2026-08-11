@@ -1,7 +1,7 @@
 // カテゴリの一覧・追加・更新・削除を行う Edge Function
 
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
-import { getServiceClient, getJwt } from '../_shared/supabase.ts';
+import { getServiceClient, getUserClient, getJwt } from '../_shared/supabase.ts';
 
 interface CategoryBody {
   id?: string;
@@ -21,10 +21,9 @@ Deno.serve(async (req) => {
     });
   }
 
-  // JWT 検証用と DB 操作用で service_role クライアントを分離する
-  // auth.getUser() 呼び出し後も RLS をバイパスし続けるため
-  const authClient = getServiceClient();
-  const { data: userData, error: userError } = await authClient.auth.getUser(jwt);
+  // JWT 検証は anon キーのユーザークライアントで行い、DB 操作は service_role クライアントで行う
+  const authClient = getUserClient(req);
+  const { data: userData, error: userError } = await authClient.auth.getUser();
   if (userError || !userData.user) {
     return new Response(JSON.stringify({ error: '認証に失敗しました' }), {
       status: 401,
