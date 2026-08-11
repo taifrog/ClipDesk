@@ -612,18 +612,42 @@ function App() {
   }
 
   // クリップ収集実行時の処理
-  const handleCollectClips = async (params: { tag?: string; keyword?: string; count: number }) => {
+  // 成功時は登録件数と診断情報を返す（0件の場合でもエラーではなく診断メッセージを含む）
+  const handleCollectClips = async (params: { tag?: string; keyword?: string; count: number }): Promise<{
+    count: number
+    message?: string
+    diagnostics?: Record<string, unknown>
+  }> => {
     const response = await fetch(`${FUNCTIONS_BASE}/collect`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(params),
     })
+    const data = await response.json().catch(() => ({}))
     if (!response.ok) {
-      const data = await response.json().catch(() => ({}))
       throw new Error(data.error || 'クリップの収集に失敗しました')
     }
     // 収集後は一覧を更新する
     await fetchData(false)
+    const resultCount = Number(data.count ?? 0)
+    let message: string | undefined
+    if (resultCount === 0) {
+      const diag = (data.diagnostics || {}) as Record<string, unknown>
+      const matchedSites = Number(diag.matched_sites ?? 0)
+      const skipped = (diag.skipped || {}) as { duplicate?: number; insertError?: number }
+      if (matchedSites === 0) {
+        message = '該当する収集元サイトが見つかりませんでした。設定からサイトを追加してください。'
+      } else if ((skipped.duplicate ?? 0) > 0) {
+        message = `新しい記事は見つかりませんでした（重複スキップ: ${skipped.duplicate}件）。`
+      } else {
+        message = '新しいクリップは見つかりませんでした。サイトのRSS/記事を確認してください。'
+      }
+    }
+    return {
+      count: resultCount,
+      message,
+      diagnostics: data.diagnostics,
+    }
   }
 
   // 掃除：チェック済み・ピン留めなしのクリップをゴミ箱に移動する
@@ -689,18 +713,25 @@ function App() {
   }
 
   // 収集元サイト追加時の処理
-  const handleAddSourceSite = async (site: { tag: string; siteUrl: string }) => {
+  // 成功時は RSS 未検出の警告メッセージを返す（サイト自体の登録は成功している）
+  const handleAddSourceSite = async (site: { tag: string; siteUrl: string }): Promise<string | undefined> => {
     const response = await fetch(`${FUNCTIONS_BASE}/source-sites`, {
       method: 'POST',
       headers: getAuthHeaders(),
       // バックエンドは snake_case の site_url を期待しているため変換する
       body: JSON.stringify({ tag: site.tag, site_url: site.siteUrl }),
     })
+    const data = await response.json().catch(() => ({}))
     if (!response.ok) {
-      const data = await response.json().catch(() => ({}))
       throw new Error(data.error || 'サイトの追加に失敗しました')
     }
     await fetchSourceSites()
+    // RSS が検出されなかった場合、警告メッセージを返す
+    if (data.rss_detected === false) {
+      const detail = data.rss_detection_error ? `（${data.rss_detection_error}）` : ''
+      return `RSSフィードを自動検出できませんでした${detail}\n手動でRSS URLを設定するか、クリップ収集時に確認してください。`
+    }
+    return undefined
   }
 
   // 収集元サイト削除時の処理

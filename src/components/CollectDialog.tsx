@@ -6,7 +6,11 @@ interface CollectDialogProps {
   isOpen: boolean
   sourceSites: SourceSite[]
   onClose: () => void
-  onCollect: (params: { tag?: string; keyword?: string; count: number }) => Promise<void>
+  onCollect: (params: {
+    tag?: string
+    keyword?: string
+    count: number
+  }) => Promise<{ count: number; message?: string; diagnostics?: Record<string, unknown> }>
 }
 
 // プリセットタグ一覧（設定にないタグも選択可能にするため）
@@ -25,6 +29,8 @@ export function CollectDialog({ isOpen, sourceSites, onClose, onCollect }: Colle
   const [isCollecting, setIsCollecting] = useState<boolean>(false)
   // エラーメッセージ
   const [error, setError] = useState<string | null>(null)
+  // 収集結果の情報メッセージ（0件時の診断など）
+  const [infoMessage, setInfoMessage] = useState<string | null>(null)
 
   // 設定済みサイトのタグとプリセットを統合した選択肢を作成する
   const tagOptions = useMemo(() => {
@@ -40,6 +46,7 @@ export function CollectDialog({ isOpen, sourceSites, onClose, onCollect }: Colle
       setKeyword('')
       setCount(5)
       setError(null)
+      setInfoMessage(null)
       setIsCollecting(false)
     }
   }, [isOpen])
@@ -55,6 +62,7 @@ export function CollectDialog({ isOpen, sourceSites, onClose, onCollect }: Colle
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setInfoMessage(null)
 
     // タグもキーワードも未入力の場合はエラー
     if (!selectedTag.trim() && !keyword.trim()) {
@@ -64,12 +72,17 @@ export function CollectDialog({ isOpen, sourceSites, onClose, onCollect }: Colle
 
     setIsCollecting(true)
     try {
-      await onCollect({
+      const result = await onCollect({
         tag: selectedTag.trim() || undefined,
         keyword: keyword.trim() || undefined,
         count,
       })
-      onClose()
+      // 0件の場合は診断メッセージを表示してダイアログは閉じない
+      if (result.count === 0) {
+        setInfoMessage(result.message || '新しいクリップは見つかりませんでした。')
+      } else {
+        onClose()
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'クリップの収集に失敗しました')
     } finally {
@@ -137,8 +150,9 @@ export function CollectDialog({ isOpen, sourceSites, onClose, onCollect }: Colle
             />
           </div>
 
-          {/* エラーメッセージ */}
+          {/* エラー・情報メッセージ */}
           {error && <p className="dialog-error">{error}</p>}
+          {infoMessage && <p className="dialog-info">{infoMessage}</p>}
 
           {/* ボタン */}
           <div className="dialog-actions">

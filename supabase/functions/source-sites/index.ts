@@ -1,3 +1,4 @@
+/// <reference lib="deno.ns" />
 // 収集元サイトの一覧・追加・削除を行う Edge Function
 
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
@@ -9,7 +10,7 @@ interface SourceSiteBody {
   site_url?: string;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
@@ -94,10 +95,12 @@ Deno.serve(async (req) => {
     }
 
     let rssUrl: string | null = null;
+    let rssDetectionError: string | null = null;
     try {
       rssUrl = await detectRssUrl(siteUrl);
-    } catch {
-      // RSS検出失敗は無視してサイト登録を続行
+    } catch (err) {
+      // RSS検出失敗は無視してサイト登録を続行するが、理由はレスポンスに含める
+      rssDetectionError = err instanceof Error ? err.message : 'RSS検出に失敗しました';
     }
 
     const { data, error } = await supabase
@@ -115,7 +118,12 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    return new Response(JSON.stringify({ ok: true, site: data }), {
+    return new Response(JSON.stringify({
+      ok: true,
+      site: data,
+      rss_detected: !!rssUrl,
+      rss_detection_error: rssDetectionError,
+    }), {
       status: 201,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

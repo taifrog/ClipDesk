@@ -11,7 +11,7 @@ interface SettingsDialogProps {
   apiKeyError: string | null
   newlyCreatedKey: string | null
   onClose: () => void
-  onAddSourceSite: (site: { tag: string; siteUrl: string }) => Promise<void>
+  onAddSourceSite: (site: { tag: string; siteUrl: string }) => Promise<string | undefined>
   onDeleteSourceSite: (id: number) => Promise<void>
   onSaveAiSummarySettings: (settings: AiSummarySettings) => Promise<void>
   onFetchApiKeys: () => Promise<void>
@@ -55,6 +55,8 @@ export function SettingsDialog({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
   // エラーメッセージ
   const [error, setError] = useState<string | null>(null)
+  // 警告メッセージ（RSS未検出など、エラーではない注意喚起）
+  const [warning, setWarning] = useState<string | null>(null)
   // 削除中のサイトID
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
@@ -78,6 +80,7 @@ export function SettingsDialog({
       setTag('')
       setSiteUrl('')
       setError(null)
+      setWarning(null)
       setIsSubmitting(false)
       setDeletingId(null)
       setAiSettingsSavedMessage(null)
@@ -151,6 +154,7 @@ export function SettingsDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setWarning(null)
 
     const trimmedTag = tag.trim()
     const trimmedUrl = siteUrl.trim()
@@ -170,9 +174,13 @@ export function SettingsDialog({
 
     setIsSubmitting(true)
     try {
-      await onAddSourceSite({ tag: trimmedTag, siteUrl: trimmedUrl })
+      const warningMessage = await onAddSourceSite({ tag: trimmedTag, siteUrl: trimmedUrl })
       setTag('')
       setSiteUrl('')
+      // RSS 未検出の警告があれば表示する
+      if (warningMessage) {
+        setWarning(warningMessage)
+      }
     } catch (err) {
       let message = err instanceof Error ? err.message : 'サイトの追加に失敗しました'
       // API から返却されたエラーコードに応じて、より分かりやすいメッセージに置き換える
@@ -444,7 +452,8 @@ export function SettingsDialog({
           )}
         </section>
 
-        {/* エラーメッセージ */}
+        {/* 警告・エラーメッセージ */}
+        {warning && <p className="dialog-warning">{warning}</p>}
         {error && <p className="dialog-error">{error}</p>}
 
         {/* 閉じるボタン */}
