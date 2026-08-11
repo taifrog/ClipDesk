@@ -71,12 +71,15 @@ jobs:
           version: latest
 
       # 本番 DB へのマイグレーション適用
-      - name: マイグレーションを適用
+      # supabase db push は --project-ref に対応していないため、link してから実行する
+      - name: プロジェクトをリンクしてマイグレーションを適用
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
-        run: supabase db push --project-ref "$SUPABASE_PROJECT_ID"
+        run: |
+          supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
+          supabase db push
 
       # Edge Functions をデプロイ
       - name: Edge Functions をデプロイ
