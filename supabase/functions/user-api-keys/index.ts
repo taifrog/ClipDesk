@@ -1,7 +1,7 @@
 // Chrome 拡張機能等で使用する API キーの管理を行う Edge Function
 
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
-import { getServiceClient, getJwt } from '../_shared/supabase.ts';
+import { getServiceClient, getUserClient, getJwt } from '../_shared/supabase.ts';
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req);
@@ -15,8 +15,9 @@ Deno.serve(async (req) => {
     });
   }
 
-  const supabase = getServiceClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser(jwt);
+  // JWT 検証は anon キーのユーザークライアントで行い、DB 操作は service_role クライアントで行う
+  const authClient = getUserClient(req);
+  const { data: userData, error: userError } = await authClient.auth.getUser();
   if (userError || !userData.user) {
     return new Response(JSON.stringify({ error: '認証に失敗しました' }), {
       status: 401,
@@ -24,6 +25,7 @@ Deno.serve(async (req) => {
     });
   }
   const userId = userData.user.id;
+  const supabase = getServiceClient();
 
   // GET /user-api-keys 一覧取得
   if (req.method === 'GET') {

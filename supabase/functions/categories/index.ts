@@ -35,15 +35,6 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const supabase = getServiceClient();
 
-  // 一時的なデバッグ: 使用されているキーの role クレームを確認
-  try {
-    const key = Deno.env.get('SB_SERVICE_ROLE_KEY') || '';
-    const payload = JSON.parse(atob(key.split('.')[1]));
-    console.log('[DEBUG] SB_SERVICE_ROLE_KEY role:', payload.role);
-  } catch (e) {
-    console.log('[DEBUG] Failed to decode SB_SERVICE_ROLE_KEY:', e);
-  }
-
   // GET /categories 一覧
   if (req.method === 'GET') {
     const { data, error } = await supabase

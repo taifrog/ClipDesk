@@ -34,14 +34,17 @@ Deno.serve(async (req) => {
     });
   }
 
-  const supabase = getServiceClient();
-  const userId = await resolveUserIdByApiKey(supabase, apiKey);
+  // API キーからユーザー ID を解決する際と DB 操作時で service_role クライアントを分離する
+  const adminClient = getServiceClient();
+  const userId = await resolveUserIdByApiKey(adminClient, apiKey);
   if (!userId) {
     return new Response(JSON.stringify({ error: '無効なAPIキーです' }), {
       status: 403,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
+
+  const supabase = getServiceClient();
 
   // POST のみ受け付ける
   if (req.method !== 'POST') {

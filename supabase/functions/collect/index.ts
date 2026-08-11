@@ -2,7 +2,7 @@
 // 登録済みの収集元サイトから RSS/スクレイピングで記事を収集し、クリップとして登録する。
 
 import { corsHeaders, handleCors } from '../_shared/cors.ts'
-import { getServiceClient, getJwt } from '../_shared/supabase.ts'
+import { getServiceClient, getUserClient, getJwt } from '../_shared/supabase.ts'
 import { getAppSettings } from '../_shared/settings.ts'
 import { summarizeWithOpenCodeGo } from '../_shared/ai.ts'
 import { collectArticlesFromSite } from '../_shared/rss.ts'
@@ -33,8 +33,9 @@ Deno.serve(async (req) => {
     })
   }
 
-  const supabase = getServiceClient()
-  const { data: userData, error: userError } = await supabase.auth.getUser(jwt)
+  // JWT 検証は anon キーのユーザークライアントで行い、DB 操作は service_role クライアントで行う
+  const authClient = getUserClient(req)
+  const { data: userData, error: userError } = await authClient.auth.getUser()
   if (userError || !userData.user) {
     return new Response(JSON.stringify({ error: '認証に失敗しました' }), {
       status: 401,
@@ -42,6 +43,7 @@ Deno.serve(async (req) => {
     })
   }
   const userId = userData.user.id
+  const supabase = getServiceClient()
 
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'POSTメソッドのみ許可されています' }), {
