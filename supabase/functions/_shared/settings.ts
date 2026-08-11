@@ -3,16 +3,6 @@
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.49.0';
 import { AiSummarySettings } from './ai.ts';
 
-const SUPPORTED_MODELS = new Set([
-  'gpt-4o-mini',
-  'gpt-4o',
-  'gpt-3.5-turbo',
-  'claude-3-haiku',
-  'claude-3-sonnet',
-  'gemini-1.5-flash',
-  'gemini-1.5-pro',
-]);
-
 const DEFAULT_SETTINGS: AiSummarySettings = {
   enabled: true,
   apiKey: '',
@@ -33,7 +23,8 @@ export async function getAppSettings(supabase: SupabaseClient, userId: string): 
     return DEFAULT_SETTINGS;
   }
 
-  const model = SUPPORTED_MODELS.has(data.ai_summary_model) ? data.ai_summary_model : DEFAULT_SETTINGS.model;
+  // モデル名はユーザーが自由に指定できるようにする。空文字や未定義の場合のみデフォルト値を使用する。
+  const model = data.ai_summary_model ? data.ai_summary_model : DEFAULT_SETTINGS.model;
 
   return {
     enabled: data.ai_summary_enabled,
@@ -49,7 +40,8 @@ export async function saveAppSettings(
   userId: string,
   settings: Partial<AiSummarySettings>,
 ): Promise<AiSummarySettings> {
-  const model = settings.model && SUPPORTED_MODELS.has(settings.model) ? settings.model : DEFAULT_SETTINGS.model;
+  // モデル名はユーザーが自由に指定できるようにする。空文字や未定義の場合のみデフォルト値を使用する。
+  const model = settings.model ? settings.model : DEFAULT_SETTINGS.model;
   const upsert = {
     user_id: userId,
     ai_summary_enabled: typeof settings.enabled === 'boolean' ? settings.enabled : undefined,
