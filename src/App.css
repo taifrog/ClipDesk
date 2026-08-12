@@ -1003,6 +1003,23 @@
   line-height: 1.5;
 }
 
+/* 警告メッセージ */
+.dialog-warning {
+  color: #f59e0b;
+  font-size: 14px;
+  margin: 0;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+/* 情報メッセージ */
+.dialog-info {
+  color: #3b82f6;
+  font-size: 14px;
+  margin: 0;
+  line-height: 1.5;
+}
+
 /* 設定セクション */
 .settings-section {
   margin-bottom: 24px;
