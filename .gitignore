@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# GitHub Pages 公開用ビルド成果物（GitHub Actions が生成するため Git 管理しない）
+docs
