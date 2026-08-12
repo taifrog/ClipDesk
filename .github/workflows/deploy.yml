@@ -13,11 +13,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # フロントエンドをビルドして docs/ に出力し、main ブランチにコミットして GitHub Pages 公開用とする
+  # フロントエンドをビルドして GitHub Pages にデプロイする
   deploy-web:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: リポジトリをチェックアウト
         uses: actions/checkout@v4
@@ -42,21 +47,16 @@ jobs:
       - name: SPA フォールバックを追加
         run: cp docs/index.html docs/404.html
 
-      # docs/ フォルダを GitHub Pages 公開用に main ブランチへコミット
-      # [skip ci] を付与して無限ループを防ぐ
-      - name: docs/ をコミットしてプッシュ
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/
-          if git diff --cached --quiet; then
-            echo "No changes to docs/"
-          else
-            git commit -m "chore: deploy to docs/ [skip ci]"
-            git push origin main
-          fi
+      # GitHub Pages 用にビルド成果物をアップロードする
+      - name: GitHub Pages 用アーティファクトをアップロード
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      # GitHub Pages にデプロイする
+      - name: GitHub Pages にデプロイ
+        id: deployment
+        uses: actions/deploy-pages@v4
 
   # データベースマイグレーションと Edge Functions をデプロイ
   deploy-supabase:
