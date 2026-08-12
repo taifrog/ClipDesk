@@ -1020,6 +1020,125 @@
   line-height: 1.5;
 }
 
+/* クリップ収集診断情報 */
+.collect-diagnostics {
+  margin-top: 8px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 13px;
+}
+
+.collect-diagnostics-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 10px;
+}
+
+.collect-diagnostics-summary {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text);
+}
+
+.collect-diagnostics-sites-title {
+  margin: 0 0 8px;
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+.collect-diagnostics-site-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.collect-diagnostics-site-item {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+}
+
+.collect-diagnostics-site-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.collect-diagnostics-site-tag {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.collect-diagnostics-site-status {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.collect-diagnostics-site-status.ok {
+  color: #22c55e;
+}
+
+.collect-diagnostics-site-status.ng {
+  color: var(--text);
+  opacity: 0.7;
+}
+
+.collect-diagnostics-site-url {
+  display: block;
+  color: var(--text-h);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 6px;
+}
+
+.collect-diagnostics-site-url:hover {
+  text-decoration: underline;
+}
+
+.collect-diagnostics-site-detail {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.collect-diagnostics-site-error {
+  color: #ef4444;
+  margin: 6px 0 0;
+  line-height: 1.4;
+}
+
+.collect-diagnostics-site-samples {
+  margin-top: 6px;
+  color: var(--text);
+}
+
+.collect-diagnostics-site-samples summary {
+  cursor: pointer;
+  color: var(--text-h);
+}
+
+.collect-diagnostics-site-samples ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  line-height: 1.5;
+}
+
 /* 設定セクション */
 .settings-section {
   margin-bottom: 24px;
@@ -1159,6 +1278,58 @@
 .source-site-rss.none {
   color: var(--text);
   opacity: 0.7;
+}
+
+/* RSS URL 表示行（ステータスと編集ボタンを横並びにする） */
+.source-site-rss-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* RSS URL 手動編集フォーム */
+.source-site-rss-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.source-site-rss-input {
+  flex: 1;
+  min-width: 220px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-h);
+  font-size: 13px;
+  outline: none;
+}
+
+.source-site-rss-input:focus {
+  border-color: var(--accent);
+}
+
+/* 小さめボタン（RSS URL編集・保存・キャンセル用） */
+.button-small {
+  padding: 6px 12px;
+  font-size: 13px;
+  border-radius: 6px;
+}
+
+@media (max-width: 560px) {
+  .source-site-rss-edit {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .source-site-rss-input {
+    width: 100%;
+    min-width: auto;
+  }
 }
 
 @media (max-width: 560px) {

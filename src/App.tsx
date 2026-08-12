@@ -734,6 +734,20 @@ function App() {
     return undefined
   }
 
+  // 収集元サイトの RSS URL を更新する
+  const handleUpdateSourceSiteRssUrl = async (id: number, rssUrl: string | null): Promise<void> => {
+    const response = await fetch(`${FUNCTIONS_BASE}/source-sites/${id}`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ rss_url: rssUrl }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(data.error || 'RSS URL の更新に失敗しました')
+    }
+    await fetchSourceSites()
+  }
+
   // 収集元サイト削除時の処理
   const handleDeleteSourceSite = async (id: number) => {
     const response = await fetch(`${FUNCTIONS_BASE}/source-sites/${id}`, {
@@ -865,6 +879,7 @@ function App() {
         newlyCreatedKey={newlyCreatedKey}
         onClose={() => setIsSettingsDialogOpen(false)}
         onAddSourceSite={handleAddSourceSite}
+        onUpdateSourceSiteRssUrl={handleUpdateSourceSiteRssUrl}
         onDeleteSourceSite={handleDeleteSourceSite}
         onSaveAiSummarySettings={handleSaveAiSummarySettings}
         onFetchApiKeys={fetchApiKeys}

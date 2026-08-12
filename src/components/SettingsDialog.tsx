@@ -12,6 +12,8 @@ interface SettingsDialogProps {
   newlyCreatedKey: string | null
   onClose: () => void
   onAddSourceSite: (site: { tag: string; siteUrl: string }) => Promise<string | undefined>
+  // サイトのRSS URLを手動更新するコールバック
+  onUpdateSourceSiteRssUrl: (id: number, rssUrl: string | null) => Promise<void>
   onDeleteSourceSite: (id: number) => Promise<void>
   onSaveAiSummarySettings: (settings: AiSummarySettings) => Promise<void>
   onFetchApiKeys: () => Promise<void>
@@ -40,6 +42,7 @@ export function SettingsDialog({
   newlyCreatedKey,
   onClose,
   onAddSourceSite,
+  onUpdateSourceSiteRssUrl,
   onDeleteSourceSite,
   onSaveAiSummarySettings,
   onFetchApiKeys,
@@ -59,6 +62,12 @@ export function SettingsDialog({
   const [warning, setWarning] = useState<string | null>(null)
   // 削除中のサイトID
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  // 編集中のサイトID（RSS URL 手動編集）
+  const [editingRssSiteId, setEditingRssSiteId] = useState<number | null>(null)
+  // 編集中のRSS URL入力値
+  const [editingRssUrl, setEditingRssUrl] = useState<string>('')
+  // RSS URL保存中フラグ
+  const [isSavingRssUrl, setIsSavingRssUrl] = useState<boolean>(false)
 
   // AI要約設定のローカル編集用状態
   const [localAiSettings, setLocalAiSettings] = useState<AiSummarySettings>(DEFAULT_AI_SUMMARY_SETTINGS)
@@ -83,6 +92,9 @@ export function SettingsDialog({
       setWarning(null)
       setIsSubmitting(false)
       setDeletingId(null)
+      setEditingRssSiteId(null)
+      setEditingRssUrl('')
+      setIsSavingRssUrl(false)
       setAiSettingsSavedMessage(null)
       setApiKeyLabel('')
       setIsCreatingApiKey(false)
@@ -205,6 +217,44 @@ export function SettingsDialog({
       setError(err instanceof Error ? err.message : 'サイトの削除に失敗しました')
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  // RSS URL 編集開始時の処理
+  const handleStartEditRss = (site: SourceSite) => {
+    setEditingRssSiteId(site.id)
+    setEditingRssUrl(site.rssUrl || '')
+    setError(null)
+  }
+
+  // RSS URL 編集キャンセル時の処理
+  const handleCancelEditRss = () => {
+    setEditingRssSiteId(null)
+    setEditingRssUrl('')
+  }
+
+  // RSS URL 保存ボタン押下時の処理
+  const handleSaveRss = async (id: number) => {
+    const trimmed = editingRssUrl.trim()
+    if (trimmed) {
+      // 簡易URLバリデーション
+      try {
+        new URL(trimmed)
+      } catch {
+        setError('正しいRSS URLを入力してください')
+        return
+      }
+    }
+    setIsSavingRssUrl(true)
+    setError(null)
+    try {
+      await onUpdateSourceSiteRssUrl(id, trimmed || null)
+      setEditingRssSiteId(null)
+      setEditingRssUrl('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'RSS URL の保存に失敗しました')
+    } finally {
+      setIsSavingRssUrl(false)
     }
   }
 
@@ -348,6 +398,9 @@ export function SettingsDialog({
         {/* 登録済みサイト一覧 */}
         <section className="settings-section">
           <h3 className="settings-section-title">登録済みサイト</h3>
+          <p className="dialog-description">
+            RSSが自動検出できなかったサイトは、RSS URLを手動で設定できます。空欄で保存すると未検出状態に戻ります。
+          </p>
           {sourceSites.length === 0 ? (
             <p className="empty-message">まだサイトが登録されていません。</p>
           ) : (
@@ -364,9 +417,50 @@ export function SettingsDialog({
                     >
                       {site.siteUrl}
                     </a>
-                    <span className={`source-site-rss ${site.rssUrl ? 'ok' : 'none'}`}>
-                      {site.rssUrl ? 'RSS検出済み' : 'RSS未検出'}
-                    </span>
+                    {editingRssSiteId === site.id ? (
+                      // RSS URL 編集フォーム
+                      <div className="source-site-rss-edit">
+                        <input
+                          type="url"
+                          value={editingRssUrl}
+                          onChange={(e) => setEditingRssUrl(e.target.value)}
+                          placeholder="https://example.com/feed.xml"
+                          disabled={isSavingRssUrl}
+                          className="source-site-rss-input"
+                        />
+                        <button
+                          type="button"
+                          className="button-primary button-small"
+                          onClick={() => handleSaveRss(site.id)}
+                          disabled={isSavingRssUrl}
+                        >
+                          {isSavingRssUrl ? '保存中…' : '保存'}
+                        </button>
+                        <button
+                          type="button"
+                          className="button-secondary button-small"
+                          onClick={handleCancelEditRss}
+                          disabled={isSavingRssUrl}
+                        >
+                          キャンセル
+                        </button>
+                      </div>
+                    ) : (
+                      // RSS URL 表示・編集開始ボタン
+                      <div className="source-site-rss-row">
+                        <span className={`source-site-rss ${site.rssUrl ? 'ok' : 'none'}`}>
+                          {site.rssUrl ? 'RSS検出済み' : 'RSS未検出'}
+                        </span>
+                        <button
+                          type="button"
+                          className="button-link button-small"
+                          onClick={() => handleStartEditRss(site)}
+                          disabled={deletingId === site.id}
+                        >
+                          {site.rssUrl ? 'RSS URLを編集' : 'RSS URLを手動設定'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <button
                     type="button"

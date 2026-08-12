@@ -13,6 +13,18 @@ interface CollectDialogProps {
   }) => Promise<{ count: number; message?: string; diagnostics?: Record<string, unknown> }>
 }
 
+// 診断情報のうち、サイト別の結果1件の型
+interface SiteDiagnostic {
+  id?: number
+  url?: string
+  tag?: string
+  matched?: boolean
+  rss_url?: string | null
+  article_count?: number
+  sample_titles?: string[]
+  error?: string
+}
+
 // プリセットタグ一覧（設定にないタグも選択可能にするため）
 const PRESET_TAGS = ['AI', 'エンタメ', 'スポーツ', 'テクノロジー', 'ビジネス', 'ニュース', 'ライフスタイル']
 
@@ -31,6 +43,8 @@ export function CollectDialog({ isOpen, sourceSites, onClose, onCollect }: Colle
   const [error, setError] = useState<string | null>(null)
   // 収集結果の情報メッセージ（0件時の診断など）
   const [infoMessage, setInfoMessage] = useState<string | null>(null)
+  // 収集結果の診断情報（0件時に詳細を表示するため）
+  const [diagnostics, setDiagnostics] = useState<Record<string, unknown> | null>(null)
 
   // 設定済みサイトのタグとプリセットを統合した選択肢を作成する
   const tagOptions = useMemo(() => {
@@ -47,6 +61,7 @@ export function CollectDialog({ isOpen, sourceSites, onClose, onCollect }: Colle
       setCount(5)
       setError(null)
       setInfoMessage(null)
+      setDiagnostics(null)
       setIsCollecting(false)
     }
   }, [isOpen])
@@ -56,6 +71,75 @@ export function CollectDialog({ isOpen, sourceSites, onClose, onCollect }: Colle
     if (e.target === e.currentTarget) {
       onClose()
     }
+  }
+
+  // 診断情報を人が読める形式でレンダリングする
+  const renderDiagnostics = () => {
+    if (!diagnostics) return null
+
+    const matchedSites = diagnostics.matched_sites as number | undefined
+    const requestedCount = diagnostics.requested_count as number | undefined
+    const categoryId = diagnostics.category_id as number | null | undefined
+    const skipped = diagnostics.skipped as number | undefined
+    const siteList = (diagnostics.matched_site_list as SiteDiagnostic[] | undefined) || []
+    const perSiteResults = diagnostics.per_site_results as Record<string, SiteDiagnostic> | undefined
+
+    return (
+      <div className="collect-diagnostics">
+        <h4 className="collect-diagnostics-title">収集診断情報</h4>
+        <ul className="collect-diagnostics-summary">
+          <li>マッチしたサイト数: {matchedSites ?? '不明'}</li>
+          <li>要求件数: {requestedCount ?? '不明'}</li>
+          <li>スキップ件数: {skipped ?? 0}</li>
+          <li>カテゴリID: {categoryId === null || categoryId === undefined ? '未指定' : categoryId}</li>
+        </ul>
+        {siteList.length > 0 && (
+          <div className="collect-diagnostics-sites">
+            <p className="collect-diagnostics-sites-title">サイト別の確認結果:</p>
+            <ul className="collect-diagnostics-site-list">
+              {siteList.map((site) => {
+                const detail = perSiteResults?.[String(site.id)]
+                return (
+                  <li key={site.id ?? site.url} className="collect-diagnostics-site-item">
+                    <div className="collect-diagnostics-site-header">
+                      <span className="collect-diagnostics-site-tag">{site.tag || '不明'}</span>
+                      <span className={`collect-diagnostics-site-status ${site.matched ? 'ok' : 'ng'}`}>
+                        {site.matched ? '対象' : '非対象'}
+                      </span>
+                    </div>
+                    <a
+                      href={site.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="collect-diagnostics-site-url"
+                    >
+                      {site.url}
+                    </a>
+                    <div className="collect-diagnostics-site-detail">
+                      <span>RSS: {site.rss_url ? '設定済み' : '未設定'}</span>
+                      <span>記事数: {site.article_count ?? (detail?.article_count ?? '取得不可')}</span>
+                    </div>
+                    {site.error && (
+                      <p className="collect-diagnostics-site-error">エラー: {site.error}</p>
+                    )}
+                    {site.sample_titles && site.sample_titles.length > 0 && (
+                      <details className="collect-diagnostics-site-samples">
+                        <summary>取得サンプル（{site.sample_titles.length}件）</summary>
+                        <ul>
+                          {site.sample_titles.map((title, idx) => (
+                            <li key={idx}>{title}</li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
+      </div>
+    )
   }
 
   // 収集ボタン押下時の処理
@@ -80,6 +164,7 @@ export function CollectDialog({ isOpen, sourceSites, onClose, onCollect }: Colle
       // 0件の場合は診断メッセージを表示してダイアログは閉じない
       if (result.count === 0) {
         setInfoMessage(result.message || '新しいクリップは見つかりませんでした。')
+        setDiagnostics(result.diagnostics || null)
       } else {
         onClose()
       }
@@ -153,6 +238,9 @@ export function CollectDialog({ isOpen, sourceSites, onClose, onCollect }: Colle
           {/* エラー・情報メッセージ */}
           {error && <p className="dialog-error">{error}</p>}
           {infoMessage && <p className="dialog-info">{infoMessage}</p>}
+
+          {/* 0件時の診断情報 */}
+          {renderDiagnostics()}
 
           {/* ボタン */}
           <div className="dialog-actions">

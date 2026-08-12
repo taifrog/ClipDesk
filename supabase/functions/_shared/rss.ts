@@ -31,10 +31,12 @@ async function fetchText(targetUrl: string, maxRedirects = MAX_REDIRECTS, timeou
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       },
-      redirect: 'manual',
+      // Deno Deploy / Supabase Functions 上では manual より follow の方が安定する場合がある
+      redirect: 'follow',
     });
 
-    // リダイレクト応答の場合は Location ヘッダーを追跡する
+    // follow を使っても manual 相当の挙動になる環境があるため、
+    // 3xx 応答が返ってきた場合は Location ヘッダーを自前で追跡する
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location');
       if (location) {
@@ -67,6 +69,16 @@ async function validateRssUrl(candidateUrl: string): Promise<boolean> {
 // @param siteUrl 検出対象サイトの URL
 // @return 検出した RSS/Atom URL、失敗時は null
 export async function detectRssUrl(siteUrl: string): Promise<string | null> {
+  // 入力された URL 自体が RSS/Atom フィードの場合はそのまま返す
+  // ユーザーがサイトURL欄にRSS URLを直接貼り付けた場合に対応する
+  try {
+    if (await validateRssUrl(siteUrl)) {
+      return siteUrl;
+    }
+  } catch {
+    // 無視して次の処理へ
+  }
+
   let html = '';
   try {
     html = await fetchText(siteUrl);
@@ -165,6 +177,33 @@ export function parseRss(xmlText: string, siteUrl: string): ArticleItem[] {
   return items;
 }
 
+// a タグ要素から記事タイトルを取得する
+// a タグ内に h2/h3/見出しクラス要素があればそこから取得し、なければテキスト全体を使う
+function extractArticleTitle(el: Element): string {
+  const headlineSelectors = ['h1', 'h2', 'h3', 'h4', '[class*="title"]', '[class*="headline"]', '[class*="entry-title"]'];
+  for (const selector of headlineSelectors) {
+    const child = el.querySelector(selector);
+    if (child) {
+      const text = (child.textContent || '').trim();
+      if (text.length >= 3) return text;
+    }
+  }
+
+  // a タグ内の直接のテキストノードを優先的に収集する
+  const directTexts: string[] = [];
+  el.childNodes.forEach((node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = (node.textContent || '').trim();
+      if (text) directTexts.push(text);
+    }
+  });
+  if (directTexts.length > 0) {
+    return directTexts.join(' ').trim();
+  }
+
+  return (el.textContent || '').trim();
+}
+
 // HTML から記事リンクをスクレイピングする
 // @param html HTML 文字列
 // @param siteUrl 記事 URL の相対パス解決用ベース URL
@@ -174,25 +213,43 @@ export function scrapeArticles(html: string, siteUrl: string): ArticleItem[] {
   const items: ArticleItem[] = [];
   const seen = new Set<string>();
   const baseHost = new URL(siteUrl).hostname;
+  const baseDomain = baseHost.replace(/^www\./, '');
 
   doc.querySelectorAll('a[href]').forEach((el) => {
     const href = el.getAttribute('href') || '';
-    const title = (el.textContent || '').trim();
-    if (!href || !title || title.length < 5) return;
+    if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('mailto:')) return;
+
+    const title = extractArticleTitle(el);
+    if (!title || title.length < 3) return;
+
     try {
       const url = new URL(href, siteUrl).toString();
       if (seen.has(url)) return;
       seen.add(url);
+
       const parsed = new URL(url);
-      const hostMatch = parsed.hostname === baseHost;
-      const isArticleLike = /\/(\d{4}\/\d{2}|\d{4}\/\d{2}\/\d{2}|\d{4}-\d{2}-\d{2}|articles?|posts?|news|entry|p=|post_id=)/i.test(parsed.pathname);
-      if (hostMatch && isArticleLike) {
+      const host = parsed.hostname;
+      const hostWithoutWww = host.replace(/^www\./, '');
+      // 同一ドメインまたはサブドメインを含む同一オリジンを許可する
+      const hostMatch = hostWithoutWww === baseDomain || hostWithoutWww.endsWith('.' + baseDomain);
+      if (!hostMatch) return;
+
+      const pathname = parsed.pathname;
+      // 記事らしい URL パスのパターン
+      const isArticleLike =
+        /\/(\d{4}\/\d{2}|\d{4}\/\d{2}\/\d{2}|\d{4}-\d{2}-\d{2}|articles?|posts?|news|column|topic|feature|story|entry|p=|post_id=)/i.test(pathname) ||
+        /\/(\d{4})[/-](\d{2})[/-](\d{2})/.test(pathname) ||
+        /\/(news|articles|posts|columns|topics|features)\//i.test(pathname) ||
+        /\/[a-z0-9_-]+-\d+\/?$/i.test(pathname);
+
+      if (isArticleLike) {
         items.push({ title, url, summary: '' });
       }
     } catch {
       // 無視
     }
   });
+
   return items;
 }
 

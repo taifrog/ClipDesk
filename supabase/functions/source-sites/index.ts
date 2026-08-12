@@ -8,6 +8,7 @@ import { detectRssUrl } from '../_shared/rss.ts';
 interface SourceSiteBody {
   tag?: string;
   site_url?: string;
+  rss_url?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -129,8 +130,58 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  // DELETE /source-sites/:id 削除
+  // PATCH /source-sites/:id 更新（RSS URL の手動編集など）
   const idMatch = url.pathname.match(/\/source-sites\/(\d+)$/);
+  if (idMatch && req.method === 'PATCH') {
+    const siteId = Number(idMatch[1]);
+    let body: SourceSiteBody;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: 'JSONボディが不正です' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const updates: Partial<{ tag: string; site_url: string; rss_url: string | null }> = {};
+    if ('rss_url' in body) {
+      // 空文字は null として扱う
+      updates.rss_url = body.rss_url ? String(body.rss_url).trim() : null;
+    }
+    if ('tag' in body) {
+      updates.tag = String(body.tag || '').trim();
+    }
+    if ('site_url' in body) {
+      updates.site_url = String(body.site_url || '').trim();
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return new Response(JSON.stringify({ error: '更新する項目がありません' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data, error } = await supabase
+      .from('source_sites')
+      .update(updates)
+      .eq('id', siteId)
+      .eq('user_id', userId)
+      .select()
+      .single();
+    if (error || !data) {
+      return new Response(JSON.stringify({ error: error?.message || 'サイトが見つかりません' }), {
+        status: error?.code === 'PGRST116' ? 404 : 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ ok: true, site: data }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // DELETE /source-sites/:id 削除
   if (idMatch && req.method === 'DELETE') {
     const siteId = Number(idMatch[1]);
     const { error } = await supabase.from('source_sites').delete().eq('id', siteId).eq('user_id', userId);
