@@ -147,7 +147,21 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: GitHub Release を作成・更新
+      # 同じバージョンのタグ・リリースが既存の場合は削除してから再作成する
+      - name: 既存の拡張機能リリースを削除
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="addon-v${{ steps.version.outputs.version }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release delete "$TAG" --yes
+          fi
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag -d "$TAG"
+            git push --delete origin "$TAG" || true
+          fi
+
+      - name: GitHub Release を作成
         uses: softprops/action-gh-release@v2
         with:
           tag_name: addon-v${{ steps.version.outputs.version }}
@@ -155,5 +169,3 @@ jobs:
           files: addon-chrome/clipdesk-addon-chrome.zip
           generate_release_notes: true
           make_latest: false
-          # 既存タグ・リリースが存在する場合は上書きする
-          overwrite: true
