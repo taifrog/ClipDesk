@@ -91,7 +91,19 @@ function getErrorMessage(status: number, detail: string): string {
   if (status === 405) {
     return '接続先が不正です。Supabase URL を確認してください。';
   }
-  return `ClipDeskへの投稿に失敗しました: ${status} ${detail}`;
+  // サーバーから返却された JSON エラー内容を含めて、原因特定をしやすくする
+  let extra = '';
+  if (detail) {
+    try {
+      const parsed = JSON.parse(detail);
+      if (parsed.error) {
+        extra = ` — ${parsed.error}`;
+      }
+    } catch {
+      extra = ` — ${detail}`;
+    }
+  }
+  return `ClipDeskへの投稿に失敗しました: ${status}${extra}`;
 }
 
 // クリップ作成の一連の処理を実行する

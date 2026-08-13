@@ -113,6 +113,20 @@ npm run build
 - 星アイコンでピン留め
 - カード下部の「コメントを追加…」からメモを追加
 
+## トラブルシューティング
+
+### 拡張機能からクリップすると「API キーが必要です」と表示される
+
+設定画面で API キーを発行し、拡張機能のオプションにも入力しているのに 401 エラーになる場合は、Supabase ゲートウェイ側の JWT 検証設定を確認してください。
+
+1. Supabase ダッシュボードを開く
+2. 該当プロジェクトの「Edge Functions」→「Functions」から `clip` を選択
+3. 「Verify JWT with legacy secret」のトグルが **OFF** になっているか確認する
+   - この設定が ON になっていると、ゲートウェイがリクエストを Edge Function に到達させる前に 401 を返します
+4. OFF に変更後、ブラウザ拡張機能を更新（またはブラウザを再起動）して再度クリップを試す
+
+`clip` Edge Function は独自の `x-api-key` ヘッダー認証を行うため、JWT 検証は無効にして問題ありません。
+
 ## Supabase プロジェクト構成
 
 - **Database**: Postgres + Row Level Security（RLS）

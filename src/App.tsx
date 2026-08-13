@@ -459,10 +459,17 @@ function App() {
   // 成功したらローカル状態も同期する
   const updateClip = async (id: number, updates: Partial<Pick<Clip, 'categoryId' | 'isPinned' | 'isChecked' | 'comment'>>) => {
     try {
+      // フロントエンドの camelCase プロパティを API の snake_case に変換する
+      const body: Record<string, unknown> = {}
+      if ('categoryId' in updates) body.category_id = updates.categoryId
+      if ('isPinned' in updates) body.is_pinned = updates.isPinned
+      if ('isChecked' in updates) body.is_checked = updates.isChecked
+      if ('comment' in updates) body.comment = updates.comment
+
       const response = await fetch(`${FUNCTIONS_BASE}/clips/${id}`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
-        body: JSON.stringify(updates),
+        body: JSON.stringify(body),
       })
       if (!response.ok) {
         throw new Error('クリップの更新に失敗しました')
