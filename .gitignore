@@ -25,3 +25,6 @@ dist-ssr
 
 # GitHub Pages 公開用ビルド成果物（GitHub Actions が生成するため Git 管理しない）
 docs
+
+# Chrome 拡張機能のローカル環境変数
+addon-chrome/.env

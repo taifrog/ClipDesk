@@ -55,9 +55,13 @@ cp .env.example .env
 # ローカル開発時は `supabase status` で表示された URL / anon key を設定する
 VITE_SUPABASE_URL=http://127.0.0.1:54321
 VITE_SUPABASE_ANON_KEY=your-anon-key
+
+# Web アプリの公開 URL
+# Chrome 拡張機能設定の siteUrl 既定値として使用する
+VITE_SITE_URL=https://taifrog.github.io/ClipDesk/
 ```
 
-本番環境では、GitHub Actions の Secrets（`VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY`）から注入されます。
+本番環境では、GitHub Actions の Secrets（`VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY`、`VITE_SITE_URL`）から注入されます。
 
 ### 4. フロントエンド開発サーバーを起動する
 
@@ -90,7 +94,10 @@ npm run build
 拡張機能アイコンを右クリック →「オプション」から、以下を設定してください。
 
 - **ClipDesk サイト URL**: `https://taifrog.github.io/ClipDesk/`（ローカル開発時は `http://localhost:5173`）
+- **Supabase URL**: 使用している Supabase プロジェクトの URL（既定値が表示されていればそのままで可）
 - **API キー**: ClipDesk サイトの「設定」→「拡張機能 API キー」で発行したキー
+
+設定は、ClipDesk サイトの「設定」で API キーを発行後に表示される「拡張機能設定をコピー」ボタンから JSON をコピーし、拡張機能のオプション画面に貼り付けることもできます。
 
 ### 8. クリップを投稿する
 
@@ -150,27 +157,42 @@ npm run build
 拡張機能アイコンを右クリック →「オプション」から、以下を設定してください。
 
 - **ClipDesk サイト URL**: `https://taifrog.github.io/ClipDesk/` またはローカル開発サーバーの URL
+- **Supabase URL**: 使用している Supabase プロジェクトの URL
 - **API キー**: ClipDesk サイトの「設定」→「拡張機能 API キー」で発行したキー
+
+「拡張機能設定をコピー」ボタンでコピーした JSON をオプション画面の入力欄に貼り付けると、3項目をまとめて設定できます。
+
+### 配布用 zip の入手
+
+main ブランチへの push 時に、GitHub Actions でビルドされた拡張機能が GitHub Releases の `addon-vX.Y.Z` タグにアップロードされます。
+
+1. リポジトリの「Releases」を開く
+2. `ClipDesk Chrome Addon vX.Y.Z` を選択
+3. `clipdesk-addon-chrome.zip` をダウンロード
+4. zip を展開し、`dist` フォルダを「パッケージ化されていない拡張機能を読み込む」で読み込む
 
 ## CI / CD（GitHub Actions）
 
 `.github/workflows/deploy.yml` で、main ブランチへの push 時に以下を自動実行します。
 
-1. フロントエンドをビルド（`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` を Secrets から注入）
-2. ビルド成果物を `docs/` に出力し、main ブランチへコミット・プッシュ（GitHub Pages 公開用）
+1. フロントエンドをビルド（`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` / `VITE_SITE_URL` を Secrets から注入）
+2. ビルド成果物を `docs/` に出力（GitHub Pages 公開用）
 3. SPA フォールバック用の `404.html` を作成
 4. データベースマイグレーションを適用（`supabase db push`）
 5. Edge Functions をデプロイ（`supabase functions deploy`）
+6. Chrome 拡張機能をビルドし、GitHub Releases に zip を公開
 
 ### 必要な GitHub Secrets
 
 | Secret | 説明 |
 | --- | --- |
-| `VITE_SUPABASE_URL` | フロントエンド用 Supabase プロジェクト URL |
+| `VITE_SUPABASE_URL` | フロントエンド・拡張機能用 Supabase プロジェクト URL |
 | `VITE_SUPABASE_ANON_KEY` | フロントエンド用 Supabase anon key |
+| `VITE_SITE_URL` | Web アプリの公開 URL（拡張機能設定の既定値としても使用） |
 | `SUPABASE_ACCESS_TOKEN` | Supabase CLI 用アクセストークン |
 | `SUPABASE_PROJECT_ID` | Supabase プロジェクト参照 ID（例：`xxxxxxxxxxxxxxxxxxxx`）|
 | `SUPABASE_DB_PASSWORD` | 本番 DB のパスワード |
+| `SUPABASE_SERVICE_ROLE_KEY` | Edge Functions 内でサービスロールを使うためのキー |
 
 手動実行も可能です。GitHub リポジトリの「Actions」→「Deploy to GitHub Pages and Supabase」→「Run workflow」から実行してください。
 

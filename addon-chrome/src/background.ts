@@ -5,6 +5,7 @@ import type { ClipPayload, ExtensionMessage, ExtensionSettings, PageInfo } from 
 import { loadSettings } from './storage';
 
 // デバッグ用ログ出力
+// @param msg 出力するメッセージ
 function debug(msg: string): void {
   console.log('[ClipDesk BG]', msg);
 }
@@ -12,6 +13,14 @@ function debug(msg: string): void {
 // 設定を取得する
 async function getSettings(): Promise<ExtensionSettings> {
   return await loadSettings();
+}
+
+// Supabase URL と clip Edge Function のエンドポイントを組み立てる
+// @param supabaseUrl Supabase プロジェクトの URL
+// @returns clip Edge Function の完全な URL
+function buildClipEndpoint(supabaseUrl: string): string {
+  const base = supabaseUrl.replace(/\/$/, '');
+  return `${base}/functions/v1/clip`;
 }
 
 // content script が注入可能なスキームか判定する
@@ -65,8 +74,24 @@ async function postToClipDesk(payload: ClipPayload, siteUrl: string, apiKey: str
 
   if (!response.ok) {
     const text = await response.text().catch(() => '');
-    throw new Error(`ClipDeskへの投稿に失敗しました: ${response.status} ${text}`);
+    throw new Error(getErrorMessage(response.status, text));
   }
+}
+
+// ステータスコードに応じたユーザー向けエラーメッセージを返す
+// @param status HTTP ステータスコード
+// @param detail サーバーから返却された詳細メッセージ
+function getErrorMessage(status: number, detail: string): string {
+  if (status === 401) {
+    return 'API キーが必要です。オプション画面で API キーを設定してください。';
+  }
+  if (status === 403) {
+    return 'API キーが無効です。Webアプリの設定画面で再発行してください。';
+  }
+  if (status === 405) {
+    return '接続先が不正です。Supabase URL を確認してください。';
+  }
+  return `ClipDeskへの投稿に失敗しました: ${status} ${detail}`;
 }
 
 // クリップ作成の一連の処理を実行する
@@ -75,7 +100,10 @@ async function createClip(): Promise<{ ok: true; payload: ClipPayload } | { ok: 
   try {
     const settings = await getSettings();
     if (!settings.siteUrl) {
-      return { ok: false, error: '投稿先URLが設定されていません。オプション画面から設定してください。' };
+      return { ok: false, error: 'ClipDesk サイト URL が設定されていません。オプション画面から設定してください。' };
+    }
+    if (!settings.supabaseUrl) {
+      return { ok: false, error: 'Supabase URL が設定されていません。オプション画面から設定してください。' };
     }
     if (!settings.apiKey) {
       return { ok: false, error: 'API キーが設定されていません。Webアプリの設定画面で発行してください。' };
@@ -91,7 +119,8 @@ async function createClip(): Promise<{ ok: true; payload: ClipPayload } | { ok: 
 
     debug(`送信ペイロード: rawBody=${payload.rawBody ? payload.rawBody.length : 0}文字, title=${payload.title.slice(0, 50)}`);
 
-    await postToClipDesk(payload, settings.siteUrl, settings.apiKey);
+    const endpoint = buildClipEndpoint(settings.supabaseUrl);
+    await postToClipDesk(payload, endpoint, settings.apiKey);
     return { ok: true, payload };
   } catch (err) {
     const message = err instanceof Error ? err.message : '不明なエラーが発生しました';

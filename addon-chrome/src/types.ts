@@ -24,11 +24,15 @@ export interface ClipPayload {
 
 // ストレージに保存する設定
 export interface ExtensionSettings {
-  // 投稿先 ClipDesk URL
-  // ローカル開発時: http://localhost:54321/functions/v1/clip
-  // Supabase Hosting 時: https://<project>.supabase.co/functions/v1/clip
+  // ClipDesk Web アプリの URL
+  // GitHub Pages 公開時: https://taifrog.github.io/ClipDesk/
+  // ローカル開発時: http://localhost:5173/
   siteUrl: string;
-  // Supabase Edge Functions 呼び出し用 API key
+  // Supabase プロジェクトの URL
+  // GitHub Pages 運用時はビルド時に VITE_SUPABASE_URL から注入される
+  // ローカル開発時: http://127.0.0.1:54321
+  supabaseUrl: string;
+  // Chrome 拡張機能等で使用する API キー
   // Web アプリの設定画面で発行した key を設定する
   apiKey: string;
 }

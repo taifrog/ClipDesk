@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import { resolve } from 'path';
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync } from 'fs';
 
@@ -42,23 +42,31 @@ function postBuildPlugin() {
   };
 }
 
-export default defineConfig({
-  build: {
-    outDir: 'dist',
-    emptyOutDir: true,
-    rollupOptions: {
-      input: {
-        popup: resolve(__dirname, 'src/popup.html'),
-        options: resolve(__dirname, 'src/options.html'),
-        background: resolve(__dirname, 'src/background.ts'),
-        content: resolve(__dirname, 'src/content.ts'),
-      },
-      output: {
-        entryFileNames: '[name].js',
-        chunkFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name].[ext]',
+export default defineConfig(({ mode }) => {
+  // .env ファイルから環境変数を読み込み、ビルド時に import.meta.env へ注入する
+  const env = loadEnv(mode, process.cwd(), '');
+
+  return {
+    define: {
+      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || ''),
+    },
+    build: {
+      outDir: 'dist',
+      emptyOutDir: true,
+      rollupOptions: {
+        input: {
+          popup: resolve(__dirname, 'src/popup.html'),
+          options: resolve(__dirname, 'src/options.html'),
+          background: resolve(__dirname, 'src/background.ts'),
+          content: resolve(__dirname, 'src/content.ts'),
+        },
+        output: {
+          entryFileNames: '[name].js',
+          chunkFileNames: 'assets/[name].js',
+          assetFileNames: 'assets/[name].[ext]',
+        },
       },
     },
-  },
-  plugins: [postBuildPlugin()],
+    plugins: [postBuildPlugin()],
+  };
 });

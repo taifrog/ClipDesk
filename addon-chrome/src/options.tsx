@@ -1,8 +1,8 @@
 // オプション画面
-// 投稿先URL・API key などの設定を管理する
+// 投稿先URL・Supabase URL・API key などの設定を管理する
 
 import { useEffect, useState } from 'react';
-import { loadSettings, saveSettings } from './storage';
+import { loadSettings, saveSettings, getDefaultSettings } from './storage';
 import type { ExtensionSettings } from './types';
 
 // オプション画面のメインコンポーネント
@@ -37,6 +37,12 @@ function Options() {
     }
   }
 
+  // デフォルト値に戻す
+  function handleReset() {
+    setSettings(getDefaultSettings());
+    setSaved(false);
+  }
+
   if (!settings) {
     return <p style={{ padding: 24 }}>読み込み中…</p>;
   }
@@ -47,18 +53,35 @@ function Options() {
       <form onSubmit={handleSubmit}>
         <div style={{ marginBottom: 16 }}>
           <label style={{ display: 'block', marginBottom: 4, fontWeight: 'bold' }}>
-            投稿先 ClipDesk URL
+            ClipDesk サイト URL
           </label>
           <input
             type="url"
             value={settings.siteUrl}
             onChange={(e) => handleChange('siteUrl', e.target.value)}
             style={{ width: '100%', padding: 8, fontSize: 14 }}
-            placeholder="https://<project>.supabase.co/functions/v1/clip"
+            placeholder="https://taifrog.github.io/ClipDesk/"
           />
           <p style={{ margin: '4px 0 0', fontSize: 12, color: '#666' }}>
-            Supabase Edge Functions の clip エンドポイントを指定してください。
-            ローカル開発時は http://localhost:54321/functions/v1/clip です。
+            GitHub Pages で公開している ClipDesk の URL を指定してください。
+            ローカル開発時は http://localhost:5173/ です。
+          </p>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'block', marginBottom: 4, fontWeight: 'bold' }}>
+            Supabase URL
+          </label>
+          <input
+            type="url"
+            value={settings.supabaseUrl}
+            onChange={(e) => handleChange('supabaseUrl', e.target.value)}
+            style={{ width: '100%', padding: 8, fontSize: 14 }}
+            placeholder="https://<project>.supabase.co"
+          />
+          <p style={{ margin: '4px 0 0', fontSize: 12, color: '#666' }}>
+            Supabase プロジェクトの URL を指定してください。
+            ローカル開発時は http://127.0.0.1:54321 です。
           </p>
         </div>
 
@@ -78,9 +101,18 @@ function Options() {
           </p>
         </div>
 
-        <button type="submit" style={{ padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}>
-          保存
-        </button>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <button type="submit" style={{ padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}>
+            保存
+          </button>
+          <button
+            type="button"
+            onClick={handleReset}
+            style={{ padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}
+          >
+            既定値に戻す
+          </button>
+        </div>
 
         {saved && <p style={{ color: '#2a7', marginTop: 12 }}>保存しました</p>}
         {error && <p style={{ color: '#c33', marginTop: 12 }}>{error}</p>}

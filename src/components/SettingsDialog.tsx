@@ -82,6 +82,8 @@ export function SettingsDialog({
   const [isCreatingApiKey, setIsCreatingApiKey] = useState<boolean>(false)
   // API キー削除中のID
   const [deletingApiKeyId, setDeletingApiKeyId] = useState<number | null>(null)
+  // 拡張機能設定のコピー完了表示
+  const [extensionSettingsCopied, setExtensionSettingsCopied] = useState<boolean>(false)
 
   // ダイアログを開いたときに入力をリセットし、API キー一覧を取得する
   useEffect(() => {
@@ -159,6 +161,26 @@ export function SettingsDialog({
       await navigator.clipboard.writeText(newlyCreatedKey)
     } catch (err) {
       console.error('コピー失敗:', err)
+    }
+  }
+
+  // Chrome 拡張機能向けの設定 JSON をクリップボードにコピーする
+  const handleCopyExtensionSettings = async () => {
+    if (!newlyCreatedKey) return
+    const siteUrl = import.meta.env.VITE_SITE_URL || 'https://taifrog.github.io/ClipDesk/'
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+    const settings = {
+      siteUrl,
+      supabaseUrl,
+      apiKey: newlyCreatedKey,
+    }
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(settings, null, 2))
+      setExtensionSettingsCopied(true)
+      // 3秒後にコピー完了表示を消す
+      window.setTimeout(() => setExtensionSettingsCopied(false), 3000)
+    } catch (err) {
+      console.error('拡張機能設定のコピー失敗:', err)
     }
   }
 
@@ -509,6 +531,19 @@ export function SettingsDialog({
                 <button type="button" className="button-secondary" onClick={handleCopyNewKey}>
                   コピー
                 </button>
+              </div>
+              <div className="api-key-extension-settings">
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={handleCopyExtensionSettings}
+                  disabled={extensionSettingsCopied}
+                >
+                  {extensionSettingsCopied ? 'コピーしました' : '拡張機能設定をコピー'}
+                </button>
+                <p className="dialog-description">
+                  Chrome 拡張機能のオプション画面に貼り付ける設定をクリップボードにコピーします。
+                </p>
               </div>
             </div>
           )}

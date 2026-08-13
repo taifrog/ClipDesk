@@ -41,6 +41,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SITE_URL: ${{ secrets.VITE_SITE_URL }}
         run: npm run build
 
       # SPA 用のフォールバックページを作成する
@@ -101,3 +102,58 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
         run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_ID"
+
+  # Chrome 拡張機能をビルドして GitHub Releases に公開する
+  release-addon:
+    runs-on: ubuntu-latest
+    needs: deploy-web
+    permissions:
+      contents: write
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Node.js をセットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: addon-chrome/package-lock.json
+
+      - name: 拡張機能の依存パッケージをインストール
+        working-directory: addon-chrome
+        run: npm ci
+
+      # ビルド時に Supabase URL を注入するため .env を生成する
+      - name: 拡張機能用 .env を生成
+        working-directory: addon-chrome
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+        run: |
+          echo "VITE_SUPABASE_URL=$VITE_SUPABASE_URL" > .env
+
+      - name: 拡張機能をビルド
+        working-directory: addon-chrome
+        run: npm run build
+
+      - name: 拡張機能を zip 化
+        working-directory: addon-chrome
+        run: zip -r clipdesk-addon-chrome.zip dist
+
+      - name: バージョンを取得
+        id: version
+        working-directory: addon-chrome
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: GitHub Release を作成・更新
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: addon-v${{ steps.version.outputs.version }}
+          name: ClipDesk Chrome Addon v${{ steps.version.outputs.version }}
+          files: addon-chrome/clipdesk-addon-chrome.zip
+          generate_release_notes: true
+          make_latest: false
+          # 既存タグ・リリースが存在する場合は上書きする
+          overwrite: true
