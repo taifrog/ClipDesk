@@ -188,6 +188,7 @@ jobs:
         run: |
           TAG="addon-v${{ steps.version.outputs.version }}"
           gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
             --title "ClipDesk Chrome Addon v${{ steps.version.outputs.version }}" \
             --notes "Chrome 拡張機能のビルド成果物です。" \
             --target main \
