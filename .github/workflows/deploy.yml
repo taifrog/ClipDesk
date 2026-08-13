@@ -152,13 +152,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -e
           TAG="addon-v${{ steps.version.outputs.version }}"
+
+          # 既存リリースがあれば削除する（存在しなければ何もしない）
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release delete "$TAG" --yes
           fi
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            git tag -d "$TAG"
+
+          # リモートにタグがあれば削除する（存在しなければ何もしない）
+          if git ls-remote --tags origin "$TAG" | grep -q "$TAG"; then
             git push --delete origin "$TAG" || true
+          fi
+
+          # ローカルにタグがあれば削除する
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag -d "$TAG" || true
           fi
 
       - name: GitHub Release を作成
