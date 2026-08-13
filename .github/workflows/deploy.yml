@@ -140,7 +140,19 @@ jobs:
         working-directory: addon-chrome
         run: zip -r clipdesk-addon-chrome.zip dist
 
+      - name: ビルド成果物を確認
+        working-directory: addon-chrome
+        run: |
+          ls -la
+          ls -la dist || true
+
+      - name: gh 認証状態を確認
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh auth status
+
       - name: バージョンを取得
+
         id: version
         working-directory: addon-chrome
         run: |
