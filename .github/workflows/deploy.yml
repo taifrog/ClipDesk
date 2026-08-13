@@ -152,7 +152,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -e
+          set +e
           TAG="addon-v${{ steps.version.outputs.version }}"
 
           # 既存リリースがあれば削除する（存在しなければ何もしない）
@@ -162,19 +162,21 @@ jobs:
 
           # リモートにタグがあれば削除する（存在しなければ何もしない）
           if git ls-remote --tags origin "$TAG" | grep -q "$TAG"; then
-            git push --delete origin "$TAG" || true
+            git push --delete origin "$TAG"
           fi
 
           # ローカルにタグがあれば削除する
           if git rev-parse "$TAG" >/dev/null 2>&1; then
-            git tag -d "$TAG" || true
+            git tag -d "$TAG"
           fi
 
       - name: GitHub Release を作成
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: addon-v${{ steps.version.outputs.version }}
-          name: ClipDesk Chrome Addon v${{ steps.version.outputs.version }}
-          files: addon-chrome/clipdesk-addon-chrome.zip
-          generate_release_notes: true
-          make_latest: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="addon-v${{ steps.version.outputs.version }}"
+          gh release create "$TAG" \
+            --title "ClipDesk Chrome Addon v${{ steps.version.outputs.version }}" \
+            --notes "Chrome 拡張機能のビルド成果物です。" \
+            --target main \
+            addon-chrome/clipdesk-addon-chrome.zip
