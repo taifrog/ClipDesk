@@ -26,6 +26,9 @@ const FUNCTIONS_BASE = import.meta.env.DEV
   ? '/functions/v1'
   : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 
+// 1ページあたりに表示するクリップ件数
+const CLIPS_PER_PAGE = 20
+
 // Supabase から返されるクリップの生データ（snake_case）をアプリ内の Clip 型に正規化する
 function normalizeApiClip(raw: Record<string, unknown>): Clip {
   return {
