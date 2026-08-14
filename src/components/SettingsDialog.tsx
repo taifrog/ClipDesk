@@ -20,6 +20,8 @@ interface SettingsDialogProps {
   onFetchApiKeys: () => Promise<void>
   onCreateApiKey: (label: string) => Promise<void>
   onDeleteApiKey: (id: number) => Promise<void>
+  // API キーを再発行するコールバック
+  onRegenerateApiKey: (id: number) => Promise<void>
   onClearNewlyCreatedKey: () => void
 }
 
@@ -49,6 +51,7 @@ export function SettingsDialog({
   onFetchApiKeys,
   onCreateApiKey,
   onDeleteApiKey,
+  onRegenerateApiKey,
   onClearNewlyCreatedKey,
 }: SettingsDialogProps) {
   // 新規登録用のタグ
@@ -83,6 +86,8 @@ export function SettingsDialog({
   const [isCreatingApiKey, setIsCreatingApiKey] = useState<boolean>(false)
   // API キー削除中のID
   const [deletingApiKeyId, setDeletingApiKeyId] = useState<number | null>(null)
+  // API キー再発行中のID
+  const [regeneratingApiKeyId, setRegeneratingApiKeyId] = useState<number | null>(null)
   // 拡張機能設定のコピー完了表示
   const [extensionSettingsCopied, setExtensionSettingsCopied] = useState<boolean>(false)
   // スマホ共有用URLのコピー完了表示
@@ -156,6 +161,26 @@ export function SettingsDialog({
       setError(err instanceof Error ? err.message : 'API キーの削除に失敗しました')
     } finally {
       setDeletingApiKeyId(null)
+    }
+  }
+
+  // API キー再発行時の処理
+  // 再発行すると既存のキーが無効になるため、確認ダイアログを表示する
+  const handleRegenerateApiKey = async (id: number) => {
+    if (
+      !window.confirm(
+        'この API キーを再発行しますか？\n再発行すると、既存のキーは使用できなくなります。スマホなど他の端末で使用中の場合は設定し直す必要があります。',
+      )
+    )
+      return
+    setRegeneratingApiKeyId(id)
+    setError(null)
+    try {
+      await onRegenerateApiKey(id)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'API キーの再発行に失敗しました')
+    } finally {
+      setRegeneratingApiKeyId(null)
     }
   }
 
@@ -634,14 +659,24 @@ export function SettingsDialog({
                       {key.lastUsedAt ? `最終使用: ${new Date(key.lastUsedAt).toLocaleString('ja-JP')}` : '未使用'}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    className="button-danger"
-                    onClick={() => handleDeleteApiKey(key.id)}
-                    disabled={deletingApiKeyId === key.id}
-                  >
-                    {deletingApiKeyId === key.id ? '削除中…' : '削除'}
-                  </button>
+                  <div className="api-key-actions">
+                    <button
+                      type="button"
+                      className="button-secondary button-small"
+                      onClick={() => handleRegenerateApiKey(key.id)}
+                      disabled={regeneratingApiKeyId === key.id || deletingApiKeyId === key.id}
+                    >
+                      {regeneratingApiKeyId === key.id ? '再発行中…' : '再発行'}
+                    </button>
+                    <button
+                      type="button"
+                      className="button-danger button-small"
+                      onClick={() => handleDeleteApiKey(key.id)}
+                      disabled={deletingApiKeyId === key.id || regeneratingApiKeyId === key.id}
+                    >
+                      {deletingApiKeyId === key.id ? '削除中…' : '削除'}
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>

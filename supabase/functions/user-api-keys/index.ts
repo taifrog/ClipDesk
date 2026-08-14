@@ -88,6 +88,60 @@ Deno.serve(async (req) => {
     });
   }
 
+  // PATCH /user-api-keys/:id 再発行
+  if (req.method === 'PATCH') {
+    const url = new URL(req.url);
+    const segments = url.pathname.split('/').filter(Boolean);
+    const id = segments.length >= 2 ? Number(segments[segments.length - 1]) : NaN;
+    if (Number.isNaN(id)) {
+      return new Response(JSON.stringify({ error: 'id が不正です' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 既存キーのラベルを取得する
+    const { data: existingKey, error: fetchError } = await supabase
+      .from('user_api_keys')
+      .select('label')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (fetchError || !existingKey) {
+      return new Response(JSON.stringify({ error: 'API キーが見つかりません' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 新しい平文キーを生成する
+    const rawKey = `cdk_${crypto.randomUUID().replace(/-/g, '')}`;
+    const encoder = new TextEncoder();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(rawKey));
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const keyHash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+
+    const { data, error } = await supabase
+      .from('user_api_keys')
+      .update({ key_hash: keyHash })
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select('id, label, created_at')
+      .single();
+
+    if (error || !data) {
+      return new Response(JSON.stringify({ error: error?.message || 'API キーの再発行に失敗しました' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify({ ok: true, key: { ...data, rawKey } }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   // DELETE /user-api-keys/:id 削除
   if (req.method === 'DELETE') {
     const url = new URL(req.url);

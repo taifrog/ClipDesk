@@ -279,6 +279,28 @@ function App() {
     [session, getAuthHeaders],
   )
 
+  // 拡張機能用 API キーを再発行する
+  const handleRegenerateApiKey = useCallback(
+    async (id: number) => {
+      if (!session) return
+      const response = await fetch(`${FUNCTIONS_BASE}/user-api-keys/${id}`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(false),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'API キーの再発行に失敗しました')
+      }
+      const data = await response.json()
+      const rawKey = data.key?.rawKey
+      if (rawKey) {
+        setNewlyCreatedKey(String(rawKey))
+      }
+      await fetchApiKeys()
+    },
+    [session, getAuthHeaders, fetchApiKeys],
+  )
+
   // 発行直後の API キー表示をクリアする
   const handleClearNewlyCreatedKey = useCallback(() => {
     setNewlyCreatedKey(null)
@@ -899,6 +921,7 @@ function App() {
         onFetchApiKeys={fetchApiKeys}
         onCreateApiKey={handleCreateApiKey}
         onDeleteApiKey={handleDeleteApiKey}
+        onRegenerateApiKey={handleRegenerateApiKey}
         onClearNewlyCreatedKey={handleClearNewlyCreatedKey}
       />
 

@@ -1427,6 +1427,14 @@
   margin-top: auto;
 }
 
+/* API キー一覧のアクションボタン群（再発行・削除） */
+.api-key-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 /* API キー新規発行結果のスマホ共有エリア */
 .api-key-share-mobile {
   margin-top: 16px;
