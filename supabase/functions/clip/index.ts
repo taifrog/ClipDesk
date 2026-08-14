@@ -11,6 +11,8 @@ interface ClipPayload {
   title?: string;
   summary?: string;
   rawBody?: string;
+  categoryId?: string;
+  comment?: string;
 }
 
 // デバッグメッセージ出力用関数
@@ -64,7 +66,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  const { url, title, summary, rawBody } = body;
+  const { url, title, summary, rawBody, categoryId, comment } = body;
   if (!url || !title) {
     return new Response(JSON.stringify({ error: 'url と title は必須です', receivedBody: body }), {
       status: 400,
@@ -114,10 +116,10 @@ Deno.serve(async (req) => {
       title,
       summary: finalSummary,
       raw_body: rawBody || '',
-      category_id: 'others',
+      category_id: categoryId || 'others',
       is_pinned: false,
       is_checked: false,
-      comment: '',
+      comment: comment || '',
     })
     .select()
     .single();

@@ -6,6 +6,7 @@ import { Header } from './components/Header'
 import { SettingsDialog } from './components/SettingsDialog'
 import { Sidebar } from './components/Sidebar'
 import { AuthPanel } from './components/AuthPanel'
+import ShareTargetPage from './ShareTargetPage'
 import { getSupabaseClient } from './lib/supabase'
 import type { AiSummarySettings, Category, Clip, SortMode, SourceSite, UserApiKey } from './types'
 import './App.css'
@@ -831,6 +832,12 @@ function App() {
   // ドラッグ終了時の処理
   const handleDragEnd = () => {
     setDraggingClipId(null)
+  }
+
+  // Web Share Target からの遷移時は専用ページを表示する
+  // 未認証時でも API キー認証で登録できるため、認証状態に関わらず表示する
+  if (location.pathname === '/ClipDesk/share' || location.pathname === '/share') {
+    return <ShareTargetPage />
   }
 
   // 未認証時はログイン画面を表示する

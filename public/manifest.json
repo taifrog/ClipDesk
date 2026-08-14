@@ -1,0 +1,26 @@
+{
+  "name": "ClipDesk",
+  "short_name": "ClipDesk",
+  "description": "Webページをクリップして管理するPWA",
+  "start_url": "/ClipDesk/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "/ClipDesk/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "share_target": {
+    "action": "/ClipDesk/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
+}
