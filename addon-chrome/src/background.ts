@@ -37,8 +37,41 @@ function isInjectableUrl(url: string | undefined): boolean {
   return /^(https?|file|ftp):/i.test(url);
 }
 
+// content script が応答しない原因が「受信側が存在しない」ことか判定する
+function isReceivingEndMissingError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return message.includes('Receiving end does not exist');
+}
+
+// 対象タブに content script を動的に注入する
+// @param tabId 注入先タブID
+async function injectContentScript(tabId: number): Promise<void> {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['content.js'],
+    });
+    debug(`content script をタブ ${tabId} に動的注入しました`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    debug(`content script の動的注入に失敗: ${message}`);
+    throw err;
+  }
+}
+
+// content script にページ情報を問い合わせる
+// @param tabId 問い合わせ先タブID
+async function queryPageInfo(tabId: number): Promise<PageInfo> {
+  const response = await chrome.tabs.sendMessage(tabId, { type: 'GET_PAGE_INFO' });
+  if (!response || !response.ok) {
+    throw new Error('ページ情報の取得に失敗しました');
+  }
+  return response.info as PageInfo;
+}
+
 // アクティブなタブの情報を取得する
 // コンテンツスクリプトにメッセージを送り、タイトル・URL・本文を取得する
+// content script が注入されていない場合は動的に注入してリトライする
 async function getActivePageInfo(): Promise<PageInfo> {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
   const tab = tabs[0];
@@ -52,17 +85,14 @@ async function getActivePageInfo(): Promise<PageInfo> {
   }
 
   try {
-    const response = await chrome.tabs.sendMessage(tab.id, { type: 'GET_PAGE_INFO' });
-    if (!response || !response.ok) {
-      throw new Error('ページ情報の取得に失敗しました');
-    }
-    return response.info as PageInfo;
+    return await queryPageInfo(tab.id);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (message.includes('Receiving end does not exist')) {
-      throw new Error('このページではクリップできません（通常のWebページでお試しください）');
+    if (!isReceivingEndMissingError(err)) {
+      throw err;
     }
-    throw err;
+    // content script が未注入の可能性があるため、動的に注入してリトライする
+    await injectContentScript(tab.id);
+    return await queryPageInfo(tab.id);
   }
 }
 
