@@ -1,7 +1,7 @@
 // Service Worker（background script）
 // タブ情報の取得、ClipDeskへの投稿を制御する
 
-import type { ClipPayload, ExtensionMessage, ExtensionSettings, PageInfo } from './types';
+import type { Category, ClipPayload, ExtensionMessage, ExtensionSettings, PageInfo } from './types';
 import { loadSettings } from './storage';
 
 // デバッグ用ログ出力
@@ -21,6 +21,14 @@ async function getSettings(): Promise<ExtensionSettings> {
 function buildClipEndpoint(supabaseUrl: string): string {
   const base = supabaseUrl.replace(/\/$/, '');
   return `${base}/functions/v1/clip`;
+}
+
+// Supabase URL と categories Edge Function のエンドポイントを組み立てる
+// @param supabaseUrl Supabase プロジェクトの URL
+// @returns categories Edge Function の完全な URL
+function buildCategoriesEndpoint(supabaseUrl: string): string {
+  const base = supabaseUrl.replace(/\/$/, '');
+  return `${base}/functions/v1/categories`;
 }
 
 // content script が注入可能なスキームか判定する
@@ -108,7 +116,12 @@ function getErrorMessage(status: number, detail: string): string {
 
 // クリップ作成の一連の処理を実行する
 // ページ情報取得 → Edge Function への投稿（要約はサイト側で行う）
-async function createClip(): Promise<{ ok: true; payload: ClipPayload } | { ok: false; error: string }> {
+// @param categoryId 紐づけるカテゴリID（省略可）
+// @param comment ユーザーが入力したコメント（省略可）
+async function createClip(
+  categoryId?: string,
+  comment?: string,
+): Promise<{ ok: true; payload: ClipPayload } | { ok: false; error: string }> {
   try {
     const settings = await getSettings();
     if (!settings.siteUrl) {
@@ -127,9 +140,11 @@ async function createClip(): Promise<{ ok: true; payload: ClipPayload } | { ok: 
       title: info.title,
       summary: '',
       rawBody: info.body,
+      categoryId,
+      comment,
     };
 
-    debug(`送信ペイロード: rawBody=${payload.rawBody ? payload.rawBody.length : 0}文字, title=${payload.title.slice(0, 50)}`);
+    debug(`送信ペイロード: rawBody=${payload.rawBody ? payload.rawBody.length : 0}文字, title=${payload.title.slice(0, 50)}, categoryId=${payload.categoryId || 'others'}, comment=${payload.comment ? 'あり' : 'なし'}`);
 
     const endpoint = buildClipEndpoint(settings.supabaseUrl);
     await postToClipDesk(payload, endpoint, settings.apiKey);
@@ -141,11 +156,107 @@ async function createClip(): Promise<{ ok: true; payload: ClipPayload } | { ok: 
   }
 }
 
+// カテゴリ一覧を取得する
+// @returns カテゴリ配列、またはエラー情報
+async function getCategories(): Promise<{ ok: true; categories: Category[] } | { ok: false; error: string }> {
+  try {
+    const settings = await getSettings();
+    if (!settings.supabaseUrl) {
+      return { ok: false, error: 'Supabase URL が設定されていません。オプション画面から設定してください。' };
+    }
+    if (!settings.apiKey) {
+      return { ok: false, error: 'API キーが設定されていません。Webアプリの設定画面で発行してください。' };
+    }
+
+    const endpoint = buildCategoriesEndpoint(settings.supabaseUrl);
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        'x-api-key': settings.apiKey,
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(getErrorMessage(response.status, text));
+    }
+
+    const json = (await response.json()) as { categories?: Category[] };
+    return { ok: true, categories: json.categories || [] };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '不明なエラーが発生しました';
+    debug(`カテゴリ取得失敗: ${message}`);
+    return { ok: false, error: message };
+  }
+}
+
+// 新規カテゴリを作成する
+// @param id カテゴリID
+// @param name カテゴリ表示名
+// @returns 作成されたカテゴリ、またはエラー情報
+async function createCategory(
+  id: string,
+  name: string,
+): Promise<{ ok: true; category: Category } | { ok: false; error: string }> {
+  try {
+    const settings = await getSettings();
+    if (!settings.supabaseUrl) {
+      return { ok: false, error: 'Supabase URL が設定されていません。オプション画面から設定してください。' };
+    }
+    if (!settings.apiKey) {
+      return { ok: false, error: 'API キーが設定されていません。Webアプリの設定画面で発行してください。' };
+    }
+
+    const endpoint = buildCategoriesEndpoint(settings.supabaseUrl);
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': settings.apiKey,
+      },
+      body: JSON.stringify({ id, name, icon: 'grid' }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(getErrorMessage(response.status, text));
+    }
+
+    const json = (await response.json()) as { category?: Category };
+    if (!json.category) {
+      throw new Error('カテゴリ作成の応答が不正です');
+    }
+    return { ok: true, category: json.category };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '不明なエラーが発生しました';
+    debug(`カテゴリ作成失敗: ${message}`);
+    return { ok: false, error: message };
+  }
+}
+
 // 拡張機能からのメッセージを受け取る
 chrome.runtime.onMessage.addListener((request: ExtensionMessage, _sender, sendResponse) => {
   // クリップ作成リクエスト
   if (request.type === 'CREATE_CLIP') {
-    createClip().then(sendResponse);
+    const payload = (request.payload as { categoryId?: string; comment?: string }) || {};
+    createClip(payload.categoryId, payload.comment).then(sendResponse);
+    return true;
+  }
+
+  // カテゴリ一覧取得リクエスト
+  if (request.type === 'GET_CATEGORIES') {
+    getCategories().then(sendResponse);
+    return true;
+  }
+
+  // 新規カテゴリ作成リクエスト
+  if (request.type === 'CREATE_CATEGORY') {
+    const payload = (request.payload as { id?: string; name?: string }) || {};
+    if (!payload.id || !payload.name) {
+      sendResponse({ ok: false, error: 'id と name は必須です' });
+      return true;
+    }
+    createCategory(payload.id, payload.name).then(sendResponse);
     return true;
   }
 

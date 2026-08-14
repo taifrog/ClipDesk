@@ -13,6 +13,13 @@ export interface ExtensionMessage {
   payload?: unknown;
 }
 
+// カテゴリ1件を表す型
+export interface Category {
+  id: string;    // カテゴリ識別子
+  name: string;  // 表示名
+  icon: string;  // アイコン名
+}
+
 // ClipDesk への投稿ペイロード
 // 要約はサイト側で行うため、アドオンからは summary を空で送信する
 export interface ClipPayload {
@@ -20,6 +27,8 @@ export interface ClipPayload {
   title: string;
   summary: string;
   rawBody: string;
+  categoryId?: string;  // 紐づけるカテゴリID（未指定時は 'others'）
+  comment?: string;     // ユーザーが入力したコメント
 }
 
 // ストレージに保存する設定

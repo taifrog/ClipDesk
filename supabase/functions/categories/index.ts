@@ -1,7 +1,7 @@
 // カテゴリの一覧・追加・更新・削除を行う Edge Function
 
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
-import { getServiceClient, getUserClient, getJwt } from '../_shared/supabase.ts';
+import { getServiceClient, getUserClient, getJwt, getApiKey, resolveUserIdByApiKey } from '../_shared/supabase.ts';
 
 interface CategoryBody {
   id?: string;
@@ -13,27 +13,36 @@ Deno.serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
-  const jwt = getJwt(req);
-  if (!jwt) {
+  const adminClient = getServiceClient();
+  let userId: string | null = null;
+
+  // API キー認証を優先して試行する
+  const apiKey = getApiKey(req);
+  if (apiKey) {
+    userId = await resolveUserIdByApiKey(adminClient, apiKey);
+  }
+
+  // API キーで解決できない場合は JWT 認証を試行する
+  if (!userId) {
+    const jwt = getJwt(req);
+    if (jwt) {
+      const authClient = getUserClient(req);
+      const { data: userData, error: userError } = await authClient.auth.getUser();
+      if (!userError && userData.user) {
+        userId = userData.user.id;
+      }
+    }
+  }
+
+  if (!userId) {
     return new Response(JSON.stringify({ error: '認証が必要です' }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
-  // JWT 検証は anon キーのユーザークライアントで行い、DB 操作は service_role クライアントで行う
-  const authClient = getUserClient(req);
-  const { data: userData, error: userError } = await authClient.auth.getUser();
-  if (userError || !userData.user) {
-    return new Response(JSON.stringify({ error: '認証に失敗しました' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-  const userId = userData.user.id;
-
   const url = new URL(req.url);
-  const supabase = getServiceClient();
+  const supabase = adminClient;
 
   // GET /categories 一覧
   if (req.method === 'GET') {
