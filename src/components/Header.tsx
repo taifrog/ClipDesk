@@ -2,7 +2,7 @@
 // メインエリア上部に表示されるタイトル、検索、ビュー切り替え、並び替えを提供する
 
 import { useEffect, useRef, useState } from 'react'
-import type { SortMode } from '../types'
+import type { SortMode, ViewMode } from '../types'
 
 interface HeaderProps {
   title: string
@@ -11,6 +11,8 @@ interface HeaderProps {
   onSearchChange: (query: string) => void
   sortMode: SortMode
   onSortChange: (mode: SortMode) => void
+  viewMode: ViewMode
+  onViewChange: (mode: ViewMode) => void
 }
 
 // 並び替えモードの表示ラベル
@@ -45,7 +47,7 @@ function SmallIcon({ name }: { name: string }) {
   )
 }
 
-export function Header({ title, count, searchQuery, onSearchChange, sortMode, onSortChange }: HeaderProps) {
+export function Header({ title, count, searchQuery, onSearchChange, sortMode, onSortChange, viewMode, onViewChange }: HeaderProps) {
   // 並び替えドロップダウンの開閉状態
   const [isSortOpen, setIsSortOpen] = useState(false)
   // ドロップダウンのDOM参照（外側クリック判定用）
@@ -95,10 +97,20 @@ export function Header({ title, count, searchQuery, onSearchChange, sortMode, on
 
         {/* ビュー切り替え */}
         <div className="view-toggle">
-          <button type="button" className="view-button active" aria-label="グリッド表示">
+          <button
+            type="button"
+            className={`view-button ${viewMode === 'grid' ? 'active' : ''}`}
+            aria-label="グリッド表示"
+            onClick={() => onViewChange('grid')}
+          >
             <SmallIcon name="grid" />
           </button>
-          <button type="button" className="view-button" aria-label="リスト表示">
+          <button
+            type="button"
+            className={`view-button ${viewMode === 'list' ? 'active' : ''}`}
+            aria-label="リスト表示"
+            onClick={() => onViewChange('list')}
+          >
             <SmallIcon name="list" />
           </button>
         </div>

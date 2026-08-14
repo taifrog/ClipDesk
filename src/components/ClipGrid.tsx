@@ -1,4 +1,4 @@
-import type { Category, Clip } from '../types'
+import type { Category, Clip, ViewMode } from '../types'
 import { ClipCard } from './ClipCard'
 
 // ClipGrid コンポーネントのプロパティ
@@ -6,6 +6,7 @@ interface ClipGridProps {
   title: string
   clips: Clip[]
   categories: Category[]
+  viewMode: ViewMode
   isTrash?: boolean
   onDragStart: (clipId: number) => void
   onDragEnd: () => void
@@ -25,6 +26,7 @@ export function ClipGrid({
   title,
   clips,
   categories,
+  viewMode,
   isTrash = false,
   onDragStart,
   onDragEnd,
@@ -40,12 +42,13 @@ export function ClipGrid({
   return (
     <section className="clip-grid-section">
       <h3 className="clip-grid-title">{title}</h3>
-      <div className="clip-grid">
+      <div className={`clip-grid ${viewMode === 'list' ? 'clip-grid-list' : ''}`}>
         {clips.map((clip) => (
           <ClipCard
             key={clip.id}
             clip={clip}
             category={findCategory(categories, clip.categoryId)}
+            viewMode={viewMode}
             isTrash={isTrash}
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}

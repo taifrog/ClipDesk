@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import type { Category, Clip } from '../types'
+import type { Category, Clip, ViewMode } from '../types'
 
 // ClipCard コンポーネントのプロパティ
 interface ClipCardProps {
   clip: Clip
   category: Category | undefined
+  viewMode: ViewMode
   isTrash?: boolean
   onDragStart: (clipId: number) => void
   onDragEnd: () => void
@@ -68,6 +69,7 @@ function CheckIcon({ active }: { active: boolean }) {
 export function ClipCard({
   clip,
   category,
+  viewMode,
   isTrash = false,
   onDragStart,
   onDragEnd,
@@ -105,7 +107,7 @@ export function ClipCard({
 
   return (
     <article
-      className="clip-card"
+      className={`clip-card ${viewMode === 'list' ? 'clip-card-list' : ''}`}
       draggable
       onDragStart={() => onDragStart(clip.id)}
       onDragEnd={onDragEnd}
@@ -122,12 +124,12 @@ export function ClipCard({
 
       {/* コメント編集エリア */}
       {isEditingComment ? (
-        <div className="clip-card-comment-edit">
+        <div className={`clip-card-comment-edit ${viewMode === 'list' ? 'clip-card-comment-edit-list' : ''}`}>
           <textarea
             value={commentDraft}
             onChange={(e) => setCommentDraft(e.target.value)}
             placeholder="このクリップに関するメモやコメントを入力..."
-            rows={3}
+            rows={viewMode === 'list' ? 2 : 3}
           />
           <div className="clip-card-comment-actions">
             <button type="button" className="comment-save" onClick={handleCommentSave}>
@@ -141,7 +143,7 @@ export function ClipCard({
       ) : (
         <button
           type="button"
-          className="clip-card-comment-toggle"
+          className={`clip-card-comment-toggle ${viewMode === 'list' ? 'clip-card-comment-toggle-list' : ''}`}
           onClick={() => setIsEditingComment(true)}
           aria-label={clip.comment ? 'コメントを編集' : 'コメントを追加'}
         >
@@ -151,7 +153,7 @@ export function ClipCard({
       )}
 
       {/* カードフッター */}
-      <div className="clip-card-footer">
+      <div className={`clip-card-footer ${viewMode === 'list' ? 'clip-card-footer-list' : ''}`}>
         <div className="clip-card-meta">
           {category && category.id !== 'all' && (
             <span className="clip-card-category">{category.name}</span>

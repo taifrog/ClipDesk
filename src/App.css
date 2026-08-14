@@ -535,6 +535,13 @@
   gap: 16px;
 }
 
+/* リスト表示時は1列の縦積みレイアウトにする */
+.clip-grid-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 /* クリップカード */
 .clip-card {
   display: flex;
@@ -589,6 +596,49 @@
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* リスト表示時のクリップカード：横長の1行レイアウト */
+.clip-card-list {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 16px;
+  min-height: auto;
+}
+
+.clip-card-list .clip-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.clip-card-list .clip-card-summary {
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
+.clip-card-list .clip-card-comment-toggle,
+.clip-card-list .clip-card-comment-edit {
+  width: 240px;
+  flex-shrink: 0;
+  margin-top: 0;
+}
+
+.clip-card-list .clip-card-comment-toggle-list,
+.clip-card-list .clip-card-comment-edit-list {
+  align-self: stretch;
+}
+
+.clip-card-list .clip-card-comment-toggle span {
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
+.clip-card-list .clip-card-footer-list {
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: 0;
+  min-width: 80px;
 }
 
 .clip-card-footer {
@@ -805,9 +855,29 @@
   .clip-grid {
     grid-template-columns: repeat(3, 1fr);
   }
+
+  .clip-card-list .clip-card-comment-toggle,
+  .clip-card-list .clip-card-comment-edit {
+    width: 200px;
+  }
 }
 
 @media (max-width: 900px) {
+  .clip-card-list {
+    flex-direction: column;
+  }
+
+  .clip-card-list .clip-card-comment-toggle,
+  .clip-card-list .clip-card-comment-edit {
+    width: 100%;
+  }
+
+  .clip-card-list .clip-card-footer-list {
+    flex-direction: row;
+    width: 100%;
+    margin-top: 12px;
+  }
+
   .app-layout {
     flex-direction: column;
   }

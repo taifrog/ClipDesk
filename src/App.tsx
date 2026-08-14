@@ -8,7 +8,7 @@ import { Sidebar } from './components/Sidebar'
 import { AuthPanel } from './components/AuthPanel'
 import ShareTargetPage from './ShareTargetPage'
 import { getSupabaseClient } from './lib/supabase'
-import type { AiSummarySettings, Category, Clip, SortMode, SourceSite, UserApiKey } from './types'
+import type { AiSummarySettings, Category, Clip, SortMode, SourceSite, UserApiKey, ViewMode } from './types'
 import './App.css'
 
 // AI要約設定のデフォルト値
@@ -110,6 +110,8 @@ function App() {
   const [searchQuery, setSearchQuery] = useState<string>('')
   // クリップ一覧の並び替えモード
   const [sortMode, setSortMode] = useState<SortMode>('newest')
+  // クリップ一覧の表示モード（タイル / リスト）
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
   // 収集元サイト一覧の状態
   const [sourceSites, setSourceSites] = useState<SourceSite[]>([])
   // AI要約設定の状態
@@ -445,6 +447,17 @@ function App() {
     return displayClips.filter((clip) => !clip.isPinned).slice(0, 16)
   }, [displayClips, sortMode])
 
+  // 今日登録された新規クリップ一覧
+  const todayClips = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return displayClips.filter((clip) => {
+      const received = new Date(clip.receivedAt)
+      received.setHours(0, 0, 0, 0)
+      return received.getTime() === today.getTime()
+    })
+  }, [displayClips])
+
   // カテゴリ別モードで表示するカテゴリごとのクリップグループ
   const categoryGroups = useMemo(() => {
     if (sortMode !== 'category' || selectedCategoryId === 'trash') return []
@@ -476,6 +489,11 @@ function App() {
   // 並び替えモード変更時の処理
   const handleSortChange = (mode: SortMode) => {
     setSortMode(mode)
+  }
+
+  // 表示モード変更時の処理
+  const handleViewChange = (mode: ViewMode) => {
+    setViewMode(mode)
   }
 
   // クリップ情報を Edge Functions 経由で更新する
@@ -933,6 +951,8 @@ function App() {
           onSearchChange={handleSearchChange}
           sortMode={sortMode}
           onSortChange={handleSortChange}
+          viewMode={viewMode}
+          onViewChange={handleViewChange}
         />
 
         <div className="clip-content">
@@ -952,6 +972,7 @@ function App() {
                 title={category.name}
                 clips={groupClips}
                 categories={categories}
+                viewMode={viewMode}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
                 onTogglePin={handleTogglePin}
@@ -961,10 +982,24 @@ function App() {
             ))
           ) : (
             <>
+              {selectedCategoryId !== 'trash' && todayClips.length > 0 && (
+                <ClipGrid
+                  title="新規クリップ"
+                  clips={todayClips}
+                  categories={categories}
+                  viewMode={viewMode}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onTogglePin={handleTogglePin}
+                  onToggleCheck={handleToggleCheck}
+                  onUpdateComment={handleUpdateComment}
+                />
+              )}
               <ClipGrid
                 title="ピン留め"
                 clips={pinnedClips}
                 categories={categories}
+                viewMode={viewMode}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
                 onTogglePin={handleTogglePin}
@@ -976,6 +1011,7 @@ function App() {
                 clips={normalClips}
                 categories={categories}
                 isTrash={selectedCategoryId === 'trash'}
+                viewMode={viewMode}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
                 onTogglePin={handleTogglePin}
