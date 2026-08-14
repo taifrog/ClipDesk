@@ -1427,6 +1427,68 @@
   margin-top: auto;
 }
 
+/* API キー新規発行結果のスマホ共有エリア */
+.api-key-share-mobile {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px dashed var(--accent-border);
+  border-radius: 8px;
+  background: var(--accent-bg);
+}
+
+.api-key-share-mobile-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 8px;
+}
+
+.api-key-share-mobile .dialog-description {
+  margin-bottom: 12px;
+}
+
+.api-key-qr {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.api-key-qr img {
+  width: 160px;
+  height: 160px;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.api-key-share-url {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.api-key-share-url code {
+  flex: 1;
+  min-width: 220px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-h);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+@media (max-width: 560px) {
+  .api-key-share-url {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .api-key-share-url code {
+    min-width: auto;
+  }
+}
+
 /* Web Share Target 共有受信ページ */
 .share-target-page {
   display: flex;

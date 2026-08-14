@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import QRCode from 'qrcode'
 import type { AiSummarySettings, SourceSite, UserApiKey } from '../types'
 
 // 設定ダイアログのプロパティ
@@ -84,6 +85,10 @@ export function SettingsDialog({
   const [deletingApiKeyId, setDeletingApiKeyId] = useState<number | null>(null)
   // 拡張機能設定のコピー完了表示
   const [extensionSettingsCopied, setExtensionSettingsCopied] = useState<boolean>(false)
+  // スマホ共有用URLのコピー完了表示
+  const [shareUrlCopied, setShareUrlCopied] = useState<boolean>(false)
+  // 生成したQRコードのData URL
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
 
   // ダイアログを開いたときに入力をリセットし、API キー一覧を取得する
   useEffect(() => {
@@ -164,6 +169,34 @@ export function SettingsDialog({
     }
   }
 
+  // スマホ共有受信ページへのURLを生成する
+  const shareTargetUrl = useMemo(() => {
+    if (!newlyCreatedKey) return ''
+    const siteUrl = import.meta.env.VITE_SITE_URL || window.location.origin + '/ClipDesk/'
+    // 末尾のスラッシュを正規化し、share-target パスを結合する
+    const base = siteUrl.replace(/\/$/, '')
+    return `${base}/share-target?apiKey=${encodeURIComponent(newlyCreatedKey)}`
+  }, [newlyCreatedKey])
+
+  // QRコード画像を生成する
+  useEffect(() => {
+    if (!shareTargetUrl) {
+      setQrDataUrl(null)
+      return
+    }
+    let cancelled = false
+    QRCode.toDataURL(shareTargetUrl, { width: 200, margin: 2 })
+      .then((dataUrl) => {
+        if (!cancelled) setQrDataUrl(dataUrl)
+      })
+      .catch((err) => {
+        console.error('QRコード生成失敗:', err)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [shareTargetUrl])
+
   // Chrome 拡張機能向けの設定 JSON をクリップボードにコピーする
   const handleCopyExtensionSettings = async () => {
     if (!newlyCreatedKey) return
@@ -181,6 +214,18 @@ export function SettingsDialog({
       window.setTimeout(() => setExtensionSettingsCopied(false), 3000)
     } catch (err) {
       console.error('拡張機能設定のコピー失敗:', err)
+    }
+  }
+
+  // スマホ共有用URLをクリップボードにコピーする
+  const handleCopyShareUrl = async () => {
+    if (!shareTargetUrl) return
+    try {
+      await navigator.clipboard.writeText(shareTargetUrl)
+      setShareUrlCopied(true)
+      window.setTimeout(() => setShareUrlCopied(false), 3000)
+    } catch (err) {
+      console.error('共有URLのコピー失敗:', err)
     }
   }
 
@@ -544,6 +589,28 @@ export function SettingsDialog({
                 <p className="dialog-description">
                   Chrome 拡張機能のオプション画面に貼り付ける設定をクリップボードにコピーします。
                 </p>
+              </div>
+              <div className="api-key-share-mobile">
+                <p className="api-key-share-mobile-title">スマホで設定する</p>
+                <p className="dialog-description">
+                  下のQRコードをスマホで読み取るか、共有URLをコピーしてブラウザで開くと、API キーが自動入力されます。
+                </p>
+                {qrDataUrl && (
+                  <div className="api-key-qr">
+                    <img src={qrDataUrl} alt="スマホ設定用QRコード" />
+                  </div>
+                )}
+                <div className="api-key-share-url">
+                  <code>{shareTargetUrl}</code>
+                  <button
+                    type="button"
+                    className="button-secondary"
+                    onClick={handleCopyShareUrl}
+                    disabled={shareUrlCopied}
+                  >
+                    {shareUrlCopied ? 'コピーしました' : '共有URLをコピー'}
+                  </button>
+                </div>
               </div>
             </div>
           )}

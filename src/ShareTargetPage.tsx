@@ -102,6 +102,19 @@ export default function ShareTargetPage() {
     }
   }, [])
 
+  // URL クエリパラメータから API キーを取得して自動入力する
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const apiKeyFromQuery = params.get('apiKey')
+    if (apiKeyFromQuery) {
+      setApiKey(apiKeyFromQuery)
+      // セキュリティのため、URL から apiKey クエリを削除する
+      const url = new URL(window.location.href)
+      url.searchParams.delete('apiKey')
+      window.history.replaceState({}, document.title, url.toString())
+    }
+  }, [])
+
   // 認証ヘッダーを取得する
   const getAuthHeaders = useCallback(
     (contentType = true): Record<string, string> => {
