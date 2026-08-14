@@ -390,6 +390,7 @@ function App() {
   // 選択中カテゴリの名称を取得
   const selectedCategoryName = useMemo(() => {
     if (selectedCategoryId === 'trash') return 'ゴミ箱'
+    if (selectedCategoryId === 'today') return '新規クリップ'
     const found = categories.find((cat) => cat.id === selectedCategoryId)
     return found?.name ?? 'すべてのクリップ'
   }, [categories, selectedCategoryId])
@@ -404,14 +405,24 @@ function App() {
     return new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime()
   }
 
-  // 表示対象のクリップ一覧（通常 or ゴミ箱）
+  // 表示対象のクリップ一覧（通常 or ゴミ箱 or 新規クリップ）
   // 並び替えモードに応じてソートする（ゴミ箱は常に削除日時降順）
   const displayClips = useMemo(() => {
     if (selectedCategoryId === 'trash') return trashClips
 
     let filtered = clips
-    if (selectedCategoryId !== 'all') {
+    if (selectedCategoryId !== 'all' && selectedCategoryId !== 'today') {
       filtered = clips.filter((clip) => clip.categoryId === selectedCategoryId)
+    }
+
+    if (selectedCategoryId === 'today') {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      filtered = clips.filter((clip) => {
+        const received = new Date(clip.receivedAt)
+        received.setHours(0, 0, 0, 0)
+        return received.getTime() === today.getTime()
+      })
     }
 
     if (searchQuery.trim()) {
@@ -435,28 +446,31 @@ function App() {
 
   // 上段に表示するピン留めクリップ（最大4件）
   // カテゴリ別モード時はピン留めも各カテゴリに含めるため使用しない
+  // 新規クリップ画面ではピン留めセクションを表示しない
   const pinnedClips = useMemo(() => {
-    if (sortMode === 'category') return []
+    if (sortMode === 'category' || selectedCategoryId === 'today') return []
     return displayClips.filter((clip) => clip.isPinned).slice(0, 4)
-  }, [displayClips, sortMode])
+  }, [displayClips, sortMode, selectedCategoryId])
 
   // 下段に表示する通常クリップ（最大16件）
   // カテゴリ別モード時はピン留めも各カテゴリに含めるため使用しない
+  // 新規クリップ画面では通常クリップセクションを表示しない
   const normalClips = useMemo(() => {
-    if (sortMode === 'category') return []
+    if (sortMode === 'category' || selectedCategoryId === 'today') return []
     return displayClips.filter((clip) => !clip.isPinned).slice(0, 16)
-  }, [displayClips, sortMode])
+  }, [displayClips, sortMode, selectedCategoryId])
 
-  // 今日登録された新規クリップ一覧
-  const todayClips = useMemo(() => {
+  // 今日登録された新規クリップの件数（サイドバー表示用）
+  // すべてのクリップから受信日が当日のものをカウントする
+  const todayCount = useMemo(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    return displayClips.filter((clip) => {
+    return clips.filter((clip) => {
       const received = new Date(clip.receivedAt)
       received.setHours(0, 0, 0, 0)
       return received.getTime() === today.getTime()
-    })
-  }, [displayClips])
+    }).length
+  }, [clips])
 
   // カテゴリ別モードで表示するカテゴリごとのクリップグループ
   const categoryGroups = useMemo(() => {
@@ -899,14 +913,15 @@ function App() {
 
   return (
     <div className="app-layout">
-      <Sidebar
-        categories={categories}
-        clips={clips}
-        selectedCategoryId={selectedCategoryId}
-        draggingClipId={draggingClipId}
-        trashCount={trashClips.length}
-        cleanupCount={cleanupCount}
-        onSelectCategory={handleSelectCategory}
+        <Sidebar
+          categories={categories}
+          clips={clips}
+          selectedCategoryId={selectedCategoryId}
+          draggingClipId={draggingClipId}
+          trashCount={trashClips.length}
+          cleanupCount={cleanupCount}
+          todayCount={todayCount}
+          onSelectCategory={handleSelectCategory}
         onDropToCategory={handleDropToCategory}
         onAddCategory={handleAddCategory}
         onCollectClips={handleOpenCollectDialog}
@@ -962,7 +977,9 @@ function App() {
             <p className="empty-message">
               {selectedCategoryId === 'trash'
                 ? 'ゴミ箱は空です。'
-                : 'このカテゴリにはクリップがありません。'}
+                : selectedCategoryId === 'today'
+                  ? '今日の新規クリップはありません。'
+                  : 'このカテゴリにはクリップがありません。'}
             </p>
           ) : sortMode === 'category' && selectedCategoryId !== 'trash' ? (
             // カテゴリ別モード：カテゴリごとにグループ化して表示
@@ -982,10 +999,10 @@ function App() {
             ))
           ) : (
             <>
-              {selectedCategoryId !== 'trash' && todayClips.length > 0 && (
+              {selectedCategoryId === 'today' ? (
                 <ClipGrid
                   title="新規クリップ"
-                  clips={todayClips}
+                  clips={displayClips}
                   categories={categories}
                   viewMode={viewMode}
                   onDragStart={handleDragStart}
@@ -994,31 +1011,34 @@ function App() {
                   onToggleCheck={handleToggleCheck}
                   onUpdateComment={handleUpdateComment}
                 />
+              ) : (
+                <>
+                  <ClipGrid
+                    title="ピン留め"
+                    clips={pinnedClips}
+                    categories={categories}
+                    viewMode={viewMode}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    onTogglePin={handleTogglePin}
+                    onToggleCheck={handleToggleCheck}
+                    onUpdateComment={handleUpdateComment}
+                  />
+                  <ClipGrid
+                    title={selectedCategoryId === 'trash' ? 'ゴミ箱' : 'クリップ'}
+                    clips={normalClips}
+                    categories={categories}
+                    isTrash={selectedCategoryId === 'trash'}
+                    viewMode={viewMode}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    onTogglePin={handleTogglePin}
+                    onToggleCheck={handleToggleCheck}
+                    onUpdateComment={handleUpdateComment}
+                    onRestore={handleRestoreClip}
+                  />
+                </>
               )}
-              <ClipGrid
-                title="ピン留め"
-                clips={pinnedClips}
-                categories={categories}
-                viewMode={viewMode}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-                onTogglePin={handleTogglePin}
-                onToggleCheck={handleToggleCheck}
-                onUpdateComment={handleUpdateComment}
-              />
-              <ClipGrid
-                title={selectedCategoryId === 'trash' ? 'ゴミ箱' : 'クリップ'}
-                clips={normalClips}
-                categories={categories}
-                isTrash={selectedCategoryId === 'trash'}
-                viewMode={viewMode}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-                onTogglePin={handleTogglePin}
-                onToggleCheck={handleToggleCheck}
-                onUpdateComment={handleUpdateComment}
-                onRestore={handleRestoreClip}
-              />
             </>
           )}
         </div>

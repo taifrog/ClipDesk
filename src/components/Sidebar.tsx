@@ -9,6 +9,7 @@ interface SidebarProps {
   draggingClipId: number | null
   trashCount: number
   cleanupCount: number
+  todayCount: number
   onSelectCategory: (categoryId: string) => void
   onDropToCategory: (categoryId: string) => void
   onAddCategory: () => void
@@ -105,6 +106,7 @@ export function Sidebar({
   draggingClipId,
   trashCount,
   cleanupCount,
+  todayCount,
   onSelectCategory,
   onDropToCategory,
   onAddCategory,
@@ -204,6 +206,20 @@ export function Sidebar({
                 </span>
                 <span className="category-name">{allCategory.name}</span>
                 <span className="category-count">{clips.length}</span>
+              </button>
+            </li>
+            {/* 新規クリップ：すべてのクリップの直下に配置 */}
+            <li>
+              <button
+                type="button"
+                className={`category-item ${selectedCategoryId === 'today' ? 'active' : ''}`}
+                onClick={() => onSelectCategory('today')}
+              >
+                <span className="category-icon">
+                  <Icon name="trending-up" />
+                </span>
+                <span className="category-name">新規クリップ</span>
+                <span className="category-count">{todayCount}</span>
               </button>
             </li>
           </ul>
