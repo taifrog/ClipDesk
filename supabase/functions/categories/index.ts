@@ -1,7 +1,7 @@
 // カテゴリの一覧・追加・更新・削除を行う Edge Function
 
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
-import { getServiceClient, getUserClient, getJwt, getApiKey, resolveUserIdByApiKey } from '../_shared/supabase.ts';
+import { getServiceClient, getJwt, getApiKey, resolveUserIdByApiKey, resolveUserIdByJwt } from '../_shared/supabase.ts';
 
 interface CategoryBody {
   id?: string;
@@ -26,11 +26,7 @@ Deno.serve(async (req) => {
   if (!userId) {
     const jwt = getJwt(req);
     if (jwt) {
-      const authClient = getUserClient(req);
-      const { data: userData, error: userError } = await authClient.auth.getUser();
-      if (!userError && userData.user) {
-        userId = userData.user.id;
-      }
+      userId = await resolveUserIdByJwt(adminClient, jwt);
     }
   }
 

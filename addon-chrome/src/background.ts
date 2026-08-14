@@ -198,6 +198,8 @@ async function getCategories(): Promise<{ ok: true; categories: Category[] } | {
       return { ok: false, error: 'API キーが設定されていません。Webアプリの設定画面で発行してください。' };
     }
 
+    debug(`カテゴリ一覧取得: endpoint=${buildCategoriesEndpoint(settings.supabaseUrl)}, apiKey=${settings.apiKey.slice(0, 4)}...`);
+
     const endpoint = buildCategoriesEndpoint(settings.supabaseUrl);
     const response = await fetch(endpoint, {
       method: 'GET',
@@ -212,6 +214,7 @@ async function getCategories(): Promise<{ ok: true; categories: Category[] } | {
     }
 
     const json = (await response.json()) as { categories?: Category[] };
+    debug(`カテゴリ一覧取得成功: ${json.categories?.length || 0} 件`);
     return { ok: true, categories: json.categories || [] };
   } catch (err) {
     const message = err instanceof Error ? err.message : '不明なエラーが発生しました';
@@ -236,6 +239,8 @@ async function createCategory(
     if (!settings.apiKey) {
       return { ok: false, error: 'API キーが設定されていません。Webアプリの設定画面で発行してください。' };
     }
+
+    debug(`カテゴリ作成: endpoint=${buildCategoriesEndpoint(settings.supabaseUrl)}, apiKey=${settings.apiKey.slice(0, 4)}..., id=${id}, name=${name}`);
 
     const endpoint = buildCategoriesEndpoint(settings.supabaseUrl);
     const response = await fetch(endpoint, {
