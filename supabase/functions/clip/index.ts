@@ -2,7 +2,7 @@
 // 認証は x-api-key ヘッダーによる API キー認証を行う。
 
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
-import { getServiceClient, getApiKey, resolveUserIdByApiKey } from '../_shared/supabase.ts';
+import { getServiceClient, getApiKey, getJwt, resolveUserIdByApiKey, resolveUserIdByJwt } from '../_shared/supabase.ts';
 import { summarizeWithOpenCodeGo } from '../_shared/ai.ts';
 import { getAppSettings } from '../_shared/settings.ts';
 
@@ -27,21 +27,25 @@ Deno.serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
-  // API キー認証
+  // API キー認証または JWT 認証からユーザー ID を解決する
+  const adminClient = getServiceClient();
+  let userId: string | null = null;
+
   const apiKey = getApiKey(req);
-  if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'APIキーが必要です' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+  if (apiKey) {
+    userId = await resolveUserIdByApiKey(adminClient, apiKey);
   }
 
-  // API キーからユーザー ID を解決する際と DB 操作時で service_role クライアントを分離する
-  const adminClient = getServiceClient();
-  const userId = await resolveUserIdByApiKey(adminClient, apiKey);
   if (!userId) {
-    return new Response(JSON.stringify({ error: '無効なAPIキーです' }), {
-      status: 403,
+    const jwt = getJwt(req);
+    if (jwt) {
+      userId = await resolveUserIdByJwt(adminClient, jwt);
+    }
+  }
+
+  if (!userId) {
+    return new Response(JSON.stringify({ error: 'APIキーが必要です' }), {
+      status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

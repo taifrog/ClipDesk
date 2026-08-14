@@ -202,8 +202,8 @@ export default function ShareTargetPage() {
       setResultMessage(null)
 
       try {
-        // 使用する API キーを決定する（ログイン済みなら不要、未ログインなら入力必須）
-        const effectiveApiKey = session ? undefined : apiKey.trim()
+        // 使用する API キーを決定する（入力されている場合は優先、未入力でログイン済みなら JWT を使用）
+        const effectiveApiKey = apiKey.trim()
         if (!session && !effectiveApiKey) {
           setResultMessage('API キーを入力するか、ログインしてください')
           return

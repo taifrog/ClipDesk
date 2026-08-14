@@ -42,6 +42,16 @@ export function getApiKey(req: Request): string | null {
   return req.headers.get('x-api-key') || req.headers.get('X-Api-Key') || null;
 }
 
+// JWT からユーザー ID を解決する
+// service_role クライアントを使い、トークンの検証とユーザー取得を行う
+export async function resolveUserIdByJwt(supabase: SupabaseClient, jwt: string): Promise<string | null> {
+  const { data, error } = await supabase.auth.getUser(jwt);
+  if (error || !data.user) {
+    return null;
+  }
+  return data.user.id;
+}
+
 // API キーからユーザー ID を解決する
 // 平文のキーを SHA-256 でハッシュ化し、user_api_keys テーブルで照合する
 export async function resolveUserIdByApiKey(supabase: SupabaseClient, apiKey: string): Promise<string | null> {
