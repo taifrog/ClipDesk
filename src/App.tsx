@@ -26,7 +26,7 @@ const FUNCTIONS_BASE = import.meta.env.DEV
   ? '/functions/v1'
   : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 
-// 1ページあたりに表示するクリップ件数
+// 通常クリップ・カテゴリ別クリップの1ページあたり表示件数
 const CLIPS_PER_PAGE = 20
 
 // Supabase から返されるクリップの生データ（snake_case）をアプリ内の Clip 型に正規化する
@@ -455,12 +455,12 @@ function App() {
     return displayClips.filter((clip) => clip.isPinned).slice(0, 4)
   }, [displayClips, sortMode, selectedCategoryId])
 
-  // 下段に表示する通常クリップ（最大16件）
+  // 下段に表示する通常クリップ（1ページあたりの表示件数まで）
   // カテゴリ別モード時はピン留めも各カテゴリに含めるため使用しない
   // 新規クリップ画面では通常クリップセクションを表示しない
   const normalClips = useMemo(() => {
     if (sortMode === 'category' || selectedCategoryId === 'today') return []
-    return displayClips.filter((clip) => !clip.isPinned).slice(0, 16)
+    return displayClips.filter((clip) => !clip.isPinned).slice(0, CLIPS_PER_PAGE)
   }, [displayClips, sortMode, selectedCategoryId])
 
   // 今日登録された新規クリップの件数（サイドバー表示用）
@@ -487,7 +487,7 @@ function App() {
         const categoryClips = displayClips
           .filter((clip) => clip.categoryId === category.id)
           .sort(compareReceivedAtDesc)
-          .slice(0, 16)
+          .slice(0, CLIPS_PER_PAGE)
         return { category, clips: categoryClips }
       })
       .filter((group) => group.clips.length > 0)
