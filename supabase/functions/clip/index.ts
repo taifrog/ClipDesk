@@ -88,24 +88,31 @@ Deno.serve(async (req) => {
 
   debug(`クリップ受信: ${url}, summary=${finalSummary.length}, rawBody=${finalRawBody.length}, aiEnabled=${aiSettings.enabled}`);
 
+  // AI 要約用の入力テキストを構築する
+  // 優先順位: rawBody > 共有テキスト（URL除去） > URL から取得した HTML > title のみ
+  let aiInputText = finalRawBody;
+
   // rawBody が空の場合、共有テキストのうち URL 以外の部分をフォールバックとして使用する
-  if (!finalRawBody && text) {
+  if (!aiInputText && text) {
     const textWithoutUrl = text.replace(/https?:\/\/[^\s]+/g, ' ').trim();
     if (textWithoutUrl) {
-      finalRawBody = textWithoutUrl;
-      debug(`共有テキストを rawBody フォールバックとして使用: ${finalRawBody.length}文字`);
+      aiInputText = textWithoutUrl;
+      debug(`共有テキストを AI 入力フォールバックとして使用: ${aiInputText.length}文字`);
     }
   }
 
-  // rawBody がまだ空で AI 要約が有効な場合、URL から HTML を取得して本文を補完する
-  if (!finalRawBody && url && aiSettings.enabled && aiSettings.apiKey) {
-    debug(`URL から HTML を取得して本文を補完します: ${url}`);
+  // AI 入力テキストが不足している場合（500文字未満）、URL から HTML を取得して補完する
+  // スマホ共有では text にタイトルと URL しか含まれないことが多いため
+  const MIN_AI_INPUT_LENGTH = 500;
+  if (aiInputText.length < MIN_AI_INPUT_LENGTH && url && aiSettings.enabled && aiSettings.apiKey) {
+    debug(`AI 入力テキストが不足（${aiInputText.length}文字）: URL から HTML を取得します: ${url}`);
     const fetchedText = await fetchPageText(url);
     if (fetchedText) {
+      aiInputText = fetchedText;
       finalRawBody = fetchedText;
       debug(`HTML 取得成功: ${finalRawBody.length}文字`);
     } else {
-      debug('HTML 取得失敗: 要約をスキップします');
+      debug('HTML 取得失敗: 既存のテキストで AI 要約を試行します');
     }
   }
 
@@ -114,9 +121,12 @@ Deno.serve(async (req) => {
   let eventEndDate: string | null = null;
   let location: string | null = null;
 
-  if (!finalSummary && finalRawBody && aiSettings.enabled && aiSettings.apiKey) {
+  // 要約が未設定で、AI 入力テキストが存在し、AI 設定が有効な場合に要約・イベント情報を抽出する
+  if (!finalSummary && aiInputText && aiSettings.enabled && aiSettings.apiKey) {
     try {
-      const aiResult: AiSummaryResult = await summarizeWithOpenCodeGo(finalRawBody, title, aiSettings);
+      debug(`AI 要約実行: 入力=${aiInputText.length}文字, title=${title}`);
+      const aiResult: AiSummaryResult = await summarizeWithOpenCodeGo(aiInputText, title, aiSettings);
+      debug(`AI 要約結果: summary=${aiResult.summary.length}文字, eventStartDate=${aiResult.eventStartDate}, eventEndDate=${aiResult.eventEndDate}, location=${aiResult.location}`);
       if (aiResult.summary) finalSummary = aiResult.summary;
       eventStartDate = aiResult.eventStartDate;
       eventEndDate = aiResult.eventEndDate;
@@ -125,6 +135,8 @@ Deno.serve(async (req) => {
       aiSummaryError = err instanceof Error ? err.message : '不明なエラー';
       debug(`AI要約失敗: ${aiSummaryError}`);
     }
+  } else {
+    debug(`AI 要約スキップ: finalSummary=${finalSummary.length}, aiInputText=${aiInputText.length}, aiEnabled=${aiSettings.enabled}, hasApiKey=${Boolean(aiSettings.apiKey)}`);
   }
 
   // 重複チェック（同一ユーザー内で未削除の同じURL）
