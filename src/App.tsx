@@ -63,12 +63,18 @@ const LOGICAL_CATEGORIES: Category[] = [
 ]
 
 // API から取得したカテゴリ一覧に論理カテゴリが含まれていない場合に補完する
-// ユーザーの既存データを優先しつつ、others は必ず存在させる
+// 論理カテゴリ（others 等）はフロントエンド側の定義を優先し、
+// DB に保存された古い name（例: "その他"）を上書きして常に統一された表示にする
 function ensureLogicalCategories(categories: Category[]): Category[] {
   const result = [...categories]
   for (const logical of LOGICAL_CATEGORIES) {
-    if (!result.some((cat) => cat.id === logical.id)) {
+    const index = result.findIndex((cat) => cat.id === logical.id)
+    if (index === -1) {
+      // 論理カテゴリが存在しない場合は追加する
       result.push(logical)
+    } else {
+      // 論理カテゴリが存在する場合はフロントエンド側の定義で上書きする
+      result[index] = logical
     }
   }
   return result

@@ -46,7 +46,7 @@ async function ensureOthersCategory(supabase: ReturnType<typeof getServiceClient
 
   const { data: inserted, error } = await supabase
     .from('categories')
-    .insert({ id: 'others', user_id: userId, name: 'その他', icon: 'grid', sort_order: 9999 })
+    .insert({ id: 'others', user_id: userId, name: '未分類', icon: 'grid', sort_order: 9999 })
     .select('id')
     .single()
 
