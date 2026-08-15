@@ -14,7 +14,7 @@ export const initialCategories: Category[] = [
   { id: 'lifestyle', name: 'ライフスタイル', icon: 'coffee' },
   { id: 'education', name: '教育', icon: 'book-open' },
   { id: 'news', name: 'ニュース', icon: 'globe' },
-  { id: 'others', name: 'その他', icon: 'grid' },
+  { id: 'others', name: '未分類', icon: 'grid' },
 ]
 
 // 初期クリップ一覧

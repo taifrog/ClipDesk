@@ -153,7 +153,7 @@ export default function ShareTargetPage() {
         // 論理カテゴリを補完する
         const logical = [
           { id: 'all', name: 'すべてのクリップ', icon: 'inbox' },
-          { id: 'others', name: 'その他', icon: 'grid' },
+          { id: 'others', name: '未分類', icon: 'grid' },
         ]
         const result = [...apiCategories]
         for (const cat of logical) {

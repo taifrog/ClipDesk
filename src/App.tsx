@@ -857,7 +857,7 @@ function App() {
     if (categoryId === 'all' || categoryId === 'others') return
 
     const confirmed = window.confirm(
-      `「${category.name}」を削除しますか？\nこのカテゴリに属するクリップは「その他」に移動されます。`,
+      `「${category.name}」を削除しますか？\nこのカテゴリに属するクリップは「未分類」に移動されます。`,
     )
     if (!confirmed) return
 
