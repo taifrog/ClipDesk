@@ -5,12 +5,14 @@ import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { getServiceClient, getApiKey, getJwt, resolveUserIdByApiKey, resolveUserIdByJwt } from '../_shared/supabase.ts';
 import { summarizeWithOpenCodeGo } from '../_shared/ai.ts';
 import { getAppSettings } from '../_shared/settings.ts';
+import { fetchPageText } from '../_shared/fetchPage.ts';
 
 interface ClipPayload {
   url?: string;
   title?: string;
   summary?: string;
   rawBody?: string;
+  text?: string;
   categoryId?: string;
   comment?: string;
 }
@@ -70,7 +72,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  const { url, title, summary, rawBody, categoryId, comment } = body;
+  const { url, title, summary, rawBody, text, categoryId, comment } = body;
   if (!url || !title) {
     return new Response(JSON.stringify({ error: 'url と title は必須です', receivedBody: body }), {
       status: 400,
@@ -80,14 +82,36 @@ Deno.serve(async (req) => {
 
   // AI 要約処理
   let finalSummary = summary || '';
+  let finalRawBody = rawBody || '';
   let aiSummaryError: string | null = null;
   const aiSettings = await getAppSettings(supabase, userId);
 
-  debug(`クリップ受信: ${url}, summary=${finalSummary.length}, rawBody=${rawBody?.length || 0}, aiEnabled=${aiSettings.enabled}`);
+  debug(`クリップ受信: ${url}, summary=${finalSummary.length}, rawBody=${finalRawBody.length}, aiEnabled=${aiSettings.enabled}`);
 
-  if (!finalSummary && rawBody && aiSettings.enabled && aiSettings.apiKey) {
+  // rawBody が空の場合、共有テキストのうち URL 以外の部分をフォールバックとして使用する
+  if (!finalRawBody && text) {
+    const textWithoutUrl = text.replace(/https?:\/\/[^\s]+/g, ' ').trim();
+    if (textWithoutUrl) {
+      finalRawBody = textWithoutUrl;
+      debug(`共有テキストを rawBody フォールバックとして使用: ${finalRawBody.length}文字`);
+    }
+  }
+
+  // rawBody がまだ空で AI 要約が有効な場合、URL から HTML を取得して本文を補完する
+  if (!finalRawBody && url && aiSettings.enabled && aiSettings.apiKey) {
+    debug(`URL から HTML を取得して本文を補完します: ${url}`);
+    const fetchedText = await fetchPageText(url);
+    if (fetchedText) {
+      finalRawBody = fetchedText;
+      debug(`HTML 取得成功: ${finalRawBody.length}文字`);
+    } else {
+      debug('HTML 取得失敗: 要約をスキップします');
+    }
+  }
+
+  if (!finalSummary && finalRawBody && aiSettings.enabled && aiSettings.apiKey) {
     try {
-      const aiSummary = await summarizeWithOpenCodeGo(rawBody, title, aiSettings);
+      const aiSummary = await summarizeWithOpenCodeGo(finalRawBody, title, aiSettings);
       if (aiSummary) finalSummary = aiSummary;
     } catch (err) {
       aiSummaryError = err instanceof Error ? err.message : '不明なエラー';
@@ -119,7 +143,7 @@ Deno.serve(async (req) => {
       url,
       title,
       summary: finalSummary,
-      raw_body: rawBody || '',
+      raw_body: finalRawBody,
       category_id: categoryId || 'others',
       is_pinned: false,
       is_checked: false,

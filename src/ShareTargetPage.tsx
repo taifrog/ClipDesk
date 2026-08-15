@@ -223,6 +223,10 @@ export default function ShareTargetPage() {
           url: sharedData.url,
           title: sharedData.title,
         }
+        // 共有時に OS から渡された text（URL 以外の説明文など）を rawBody フォールバック用に送信する
+        if (sharedData.text.trim()) {
+          body.text = sharedData.text.trim()
+        }
         if (selectedCategoryId && selectedCategoryId !== 'all') {
           body.categoryId = selectedCategoryId
         }
