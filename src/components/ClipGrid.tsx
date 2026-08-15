@@ -8,6 +8,10 @@ interface ClipGridProps {
   categories: Category[]
   viewMode: ViewMode
   isTrash?: boolean
+  // ページネーション関連（省略時はページング UI を表示しない）
+  currentPage?: number
+  totalPages?: number
+  onPageChange?: (page: number) => void
   onDragStart: (clipId: number) => void
   onDragEnd: () => void
   onTogglePin: (id: number) => void
@@ -28,6 +32,9 @@ export function ClipGrid({
   categories,
   viewMode,
   isTrash = false,
+  currentPage,
+  totalPages,
+  onPageChange,
   onDragStart,
   onDragEnd,
   onTogglePin,
@@ -38,6 +45,22 @@ export function ClipGrid({
   if (clips.length === 0) {
     return null
   }
+
+  // 前のページへ移動する
+  const handlePrev = () => {
+    if (currentPage && totalPages && onPageChange && currentPage > 1) {
+      onPageChange(currentPage - 1)
+    }
+  }
+
+  // 次のページへ移動する
+  const handleNext = () => {
+    if (currentPage && totalPages && onPageChange && currentPage < totalPages) {
+      onPageChange(currentPage + 1)
+    }
+  }
+
+  const hasPagination = currentPage !== undefined && totalPages !== undefined && totalPages > 1
 
   return (
     <section className="clip-grid-section">
@@ -59,6 +82,33 @@ export function ClipGrid({
           />
         ))}
       </div>
+
+      {/* ページネーション */}
+      {hasPagination && (
+        <div className="clip-grid-pagination">
+          <button
+            type="button"
+            className="pagination-button"
+            onClick={handlePrev}
+            disabled={currentPage <= 1}
+            aria-label="前のページ"
+          >
+            前へ
+          </button>
+          <span className="pagination-info">
+            {currentPage} / {totalPages}
+          </span>
+          <button
+            type="button"
+            className="pagination-button"
+            onClick={handleNext}
+            disabled={currentPage >= totalPages}
+            aria-label="次のページ"
+          >
+            次へ
+          </button>
+        </div>
+      )}
     </section>
   )
 }

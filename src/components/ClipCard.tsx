@@ -122,7 +122,7 @@ export function ClipCard({
         <p className="clip-card-summary">{clip.summary}</p>
       </div>
 
-      {/* コメント編集エリア */}
+      {/* コメント編集エリア：コメントがある場合、または編集モードの場合のみ表示する */}
       {isEditingComment ? (
         <div className={`clip-card-comment-edit ${viewMode === 'list' ? 'clip-card-comment-edit-list' : ''}`}>
           <textarea
@@ -140,17 +140,18 @@ export function ClipCard({
             </button>
           </div>
         </div>
-      ) : (
+      ) : clip.comment ? (
+        // コメントがある場合のみ、タイトル・要約の下に表示する
         <button
           type="button"
           className={`clip-card-comment-toggle ${viewMode === 'list' ? 'clip-card-comment-toggle-list' : ''}`}
           onClick={() => setIsEditingComment(true)}
-          aria-label={clip.comment ? 'コメントを編集' : 'コメントを追加'}
+          aria-label="コメントを編集"
         >
           <CommentIcon />
-          <span>{clip.comment ? clip.comment : 'コメントを追加...'}</span>
+          <span>{clip.comment}</span>
         </button>
-      )}
+      ) : null}
 
       {/* カードフッター */}
       <div className={`clip-card-footer ${viewMode === 'list' ? 'clip-card-footer-list' : ''}`}>
@@ -171,6 +172,15 @@ export function ClipCard({
           </button>
         ) : (
           <div className="clip-card-actions">
+            {/* コメント追加・編集ボタン：空の時は追加、既存の時は編集を示す */}
+            <button
+              type="button"
+              className={`clip-card-comment-action ${clip.comment ? 'has-comment' : ''}`}
+              aria-label={clip.comment ? 'コメントを編集' : 'コメントを追加'}
+              onClick={() => setIsEditingComment(true)}
+            >
+              <CommentIcon />
+            </button>
             <button
               type="button"
               className="clip-card-check"

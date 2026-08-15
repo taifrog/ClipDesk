@@ -118,14 +118,13 @@ export function Sidebar({
 }: SidebarProps) {
   // カテゴリごとのクリップ件数をカウントする
   const getCount = (categoryId: string) => {
-    if (categoryId === 'all') return clips.length
     return clips.filter((clip) => clip.categoryId === categoryId).length
   }
 
-  // すべてのクリップ / ゴミ箱 / カテゴリを分離する
-  // all / others は含まれていなくても必ず表示できるようデフォルト値を用意する
-  const allCategory = categories.find((c) => c.id === 'all') ?? { id: 'all', name: 'すべてのクリップ', icon: 'inbox' }
-  const normalCategories = categories.filter((c) => c.id !== 'all')
+  // 未分類カテゴリを取得する（存在しなければデフォルト値を使用）
+  const othersCategory = categories.find((c) => c.id === 'others') ?? { id: 'others', name: '未分類', icon: 'grid' }
+  // ユーザー定義カテゴリ（all / others / trash / today は除く）
+  const userCategories = categories.filter((c) => !['all', 'others', 'trash', 'today'].includes(c.id))
 
   // 表示中のコンテキストメニュー情報
   const [contextMenu, setContextMenu] = useState<{
@@ -192,64 +191,66 @@ export function Sidebar({
 
       {/* ナビゲーション */}
       <nav className="sidebar-nav" aria-label="カテゴリ">
-        {/* すべてのクリップ */}
-        {allCategory && (
-          <ul className="category-list">
-            <li>
-              <button
-                type="button"
-                className={`category-item ${selectedCategoryId === 'all' ? 'active' : ''}`}
-                onClick={() => onSelectCategory('all')}
-              >
-                <span className="category-icon">
-                  <Icon name={allCategory.icon} />
-                </span>
-                <span className="category-name">{allCategory.name}</span>
-                <span className="category-count">{clips.length}</span>
-              </button>
-            </li>
-            {/* 新規クリップ：すべてのクリップの直下に配置 */}
-            <li>
-              <button
-                type="button"
-                className={`category-item ${selectedCategoryId === 'today' ? 'active' : ''}`}
-                onClick={() => onSelectCategory('today')}
-              >
-                <span className="category-icon">
-                  <Icon name="trending-up" />
-                </span>
-                <span className="category-name">新規クリップ</span>
-                <span className="category-count">{todayCount}</span>
-              </button>
-            </li>
-          </ul>
-        )}
+        {/* ナビゲーションメニュー */}
+        <ul className="category-list">
+          {/* 新規クリップ */}
+          <li>
+            <button
+              type="button"
+              className={`category-item ${selectedCategoryId === 'today' ? 'active' : ''}`}
+              onClick={() => onSelectCategory('today')}
+            >
+              <span className="category-icon">
+                <Icon name="trending-up" />
+              </span>
+              <span className="category-name">新規クリップ</span>
+              <span className="category-count">{todayCount}</span>
+            </button>
+          </li>
 
-        {/* ゴミ箱 */}
-        <button
-          type="button"
-          className={`category-item trash-item ${isTrashActive ? 'active' : ''} ${isTrashDragTarget ? 'droppable' : ''}`}
-          onClick={() => onSelectCategory('trash')}
-          onDragOver={(e) => {
-            // ドロップを許可する
-            e.preventDefault()
-          }}
-          onDrop={(e) => {
-            e.preventDefault()
-            onDropToCategory('trash')
-          }}
-        >
-          <span className="category-icon">
-            <Icon name="trash" />
-          </span>
-          <span className="category-name">ゴミ箱</span>
-          <span className="category-count">{trashCount}</span>
-        </button>
+          {/* 未分類 */}
+          <li>
+            <button
+              type="button"
+              className={`category-item ${selectedCategoryId === 'others' ? 'active' : ''}`}
+              onClick={() => onSelectCategory('others')}
+            >
+              <span className="category-icon">
+                <Icon name={othersCategory.icon} />
+              </span>
+              <span className="category-name">{othersCategory.name}</span>
+              <span className="category-count">{getCount('others')}</span>
+            </button>
+          </li>
+
+          {/* ゴミ箱 */}
+          <li>
+            <button
+              type="button"
+              className={`category-item trash-item ${isTrashActive ? 'active' : ''} ${isTrashDragTarget ? 'droppable' : ''}`}
+              onClick={() => onSelectCategory('trash')}
+              onDragOver={(e) => {
+                // ドロップを許可する
+                e.preventDefault()
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                onDropToCategory('trash')
+              }}
+            >
+              <span className="category-icon">
+                <Icon name="trash" />
+              </span>
+              <span className="category-name">ゴミ箱</span>
+              <span className="category-count">{trashCount}</span>
+            </button>
+          </li>
+        </ul>
 
         {/* カテゴリ一覧 */}
         <div className="sidebar-section-label">カテゴリ</div>
         <ul className="category-list">
-          {normalCategories.map((category) => {
+          {userCategories.map((category) => {
             const isActive = category.id === selectedCategoryId
             const isDragOverTarget = draggingClipId !== null
 
@@ -281,13 +282,13 @@ export function Sidebar({
         </ul>
       </nav>
 
-      {/* カテゴリ追加ボタン */}
+      {/* カテゴリ追加ボタン：カテゴリ一覧のすぐ下に配置 */}
       <button type="button" className="add-category-button" onClick={onAddCategory}>
         <Icon name="plus" />
         <span>カテゴリを追加</span>
       </button>
 
-      {/* 設定 */}
+      {/* 設定ボタン */}
       <button type="button" className="settings-button" onClick={onOpenSettings}>
         <Icon name="settings" />
         <span>設定</span>

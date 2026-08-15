@@ -57,25 +57,18 @@ function normalizeApiCategory(raw: Record<string, unknown>): Category {
 }
 
 // 論理カテゴリの定義（DB に依存せずフロントエンド側で常に表示する）
-// all: すべてのクリップを表示する仮想カテゴリ
 // others: どのカテゴリにも属さないクリップを表示するカテゴリ
 const LOGICAL_CATEGORIES: Category[] = [
-  { id: 'all', name: 'すべてのクリップ', icon: 'inbox' },
-  { id: 'others', name: 'その他', icon: 'grid' },
+  { id: 'others', name: '未分類', icon: 'grid' },
 ]
 
 // API から取得したカテゴリ一覧に論理カテゴリが含まれていない場合に補完する
-// ユーザーの既存データを優先しつつ、all / others は必ず存在させる
+// ユーザーの既存データを優先しつつ、others は必ず存在させる
 function ensureLogicalCategories(categories: Category[]): Category[] {
   const result = [...categories]
   for (const logical of LOGICAL_CATEGORIES) {
     if (!result.some((cat) => cat.id === logical.id)) {
-      // all は先頭に、others は末尾に追加する
-      if (logical.id === 'all') {
-        result.unshift(logical)
-      } else {
-        result.push(logical)
-      }
+      result.push(logical)
     }
   }
   return result
@@ -104,7 +97,8 @@ function App() {
   // カテゴリ一覧の状態
   const [categories, setCategories] = useState<Category[]>([])
   // 選択中のカテゴリID
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all')
+  // デフォルトは未分類とする（all は廃止）
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('others')
   // ドラッグ中のクリップID
   const [draggingClipId, setDraggingClipId] = useState<number | null>(null)
   // データ読み込み中フラグ
@@ -395,7 +389,7 @@ function App() {
     if (selectedCategoryId === 'trash') return 'ゴミ箱'
     if (selectedCategoryId === 'today') return '新規クリップ'
     const found = categories.find((cat) => cat.id === selectedCategoryId)
-    return found?.name ?? 'すべてのクリップ'
+    return found?.name ?? '未分類'
   }, [categories, selectedCategoryId])
 
   // 2つのクリップの受信日時を比較する（新しい順）
@@ -408,13 +402,20 @@ function App() {
     return new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime()
   }
 
+  // ピン留めクリップを先頭に連結し、その後に通常クリップをソート順に並べる
+  const sortClipsWithPinnedFirst = (targetClips: Clip[]) => {
+    const pinned = targetClips.filter((clip) => clip.isPinned).sort(compareReceivedAtDesc)
+    const normal = targetClips.filter((clip) => !clip.isPinned)
+    return [...pinned, ...normal]
+  }
+
   // 表示対象のクリップ一覧（通常 or ゴミ箱 or 新規クリップ）
   // 並び替えモードに応じてソートする（ゴミ箱は常に削除日時降順）
   const displayClips = useMemo(() => {
     if (selectedCategoryId === 'trash') return trashClips
 
     let filtered = clips
-    if (selectedCategoryId !== 'all' && selectedCategoryId !== 'today') {
+    if (selectedCategoryId !== 'today') {
       filtered = clips.filter((clip) => clip.categoryId === selectedCategoryId)
     }
 
@@ -437,30 +438,44 @@ function App() {
       )
     }
 
-    // カテゴリ別モード以外は受信日時でソート
-    if (sortMode === 'newest') {
+    // カテゴリ別モードはカテゴリごとにグループ化するためここではソートのみ
+    if (sortMode === 'category') {
       return [...filtered].sort(compareReceivedAtDesc)
     }
+    // 新しい順・古い順ともにピン留めを先頭に連結する
+    if (sortMode === 'newest') {
+      return sortClipsWithPinnedFirst(filtered)
+    }
     if (sortMode === 'oldest') {
-      return [...filtered].sort(compareReceivedAtAsc)
+      // 古い順では通常クリップを古い順にし、ピン留めは先頭に固定
+      const pinned = filtered.filter((clip) => clip.isPinned).sort(compareReceivedAtAsc)
+      const normal = filtered.filter((clip) => !clip.isPinned).sort(compareReceivedAtAsc)
+      return [...pinned, ...normal]
     }
     return filtered
   }, [clips, trashClips, selectedCategoryId, searchQuery, sortMode])
 
-  // 上段に表示するピン留めクリップ（最大4件）
-  // カテゴリ別モード時はピン留めも各カテゴリに含めるため使用しない
-  // 新規クリップ画面ではピン留めセクションを表示しない
-  const pinnedClips = useMemo(() => {
-    if (sortMode === 'category' || selectedCategoryId === 'today') return []
-    return displayClips.filter((clip) => clip.isPinned).slice(0, 4)
-  }, [displayClips, sortMode, selectedCategoryId])
+  // ページネーション状態（通常モード用）
+  const [currentPage, setCurrentPage] = useState<number>(1)
+  // カテゴリ別モード時の各カテゴリごとのページネーション状態
+  const [categoryPages, setCategoryPages] = useState<Record<string, number>>({})
 
-  // 下段に表示する通常クリップ（1ページあたりの表示件数まで）
-  // カテゴリ別モード時はピン留めも各カテゴリに含めるため使用しない
-  // 新規クリップ画面では通常クリップセクションを表示しない
-  const normalClips = useMemo(() => {
-    if (sortMode === 'category' || selectedCategoryId === 'today') return []
-    return displayClips.filter((clip) => !clip.isPinned).slice(0, CLIPS_PER_PAGE)
+  // 表示対象クリップをソート順に連結し、1ページあたりの件数で分割する
+  // カテゴリ別モード・新規クリップ・ゴミ箱ではページネーションを使用しない
+  const paginatedClips = useMemo(() => {
+    if (sortMode === 'category' || selectedCategoryId === 'today' || selectedCategoryId === 'trash') {
+      return displayClips
+    }
+    const start = (currentPage - 1) * CLIPS_PER_PAGE
+    return displayClips.slice(start, start + CLIPS_PER_PAGE)
+  }, [displayClips, sortMode, selectedCategoryId, currentPage])
+
+  // 総ページ数
+  const totalPages = useMemo(() => {
+    if (sortMode === 'category' || selectedCategoryId === 'today' || selectedCategoryId === 'trash') {
+      return 1
+    }
+    return Math.max(1, Math.ceil(displayClips.length / CLIPS_PER_PAGE))
   }, [displayClips, sortMode, selectedCategoryId])
 
   // 今日登録された新規クリップの件数（サイドバー表示用）
@@ -475,19 +490,18 @@ function App() {
     }).length
   }, [clips])
 
-  // カテゴリ別モードで表示するカテゴリごとのクリップグループ
+  // カテゴリ別モードで表示するカテゴリごとのクリップグループ（各カテゴリ20件でページネーション）
   const categoryGroups = useMemo(() => {
     if (sortMode !== 'category' || selectedCategoryId === 'trash') return []
 
-    // すべて/ゴミ箱以外のカテゴリを表示順（sortOrder相当）に並べる
-    const visibleCategories = categories.filter((cat) => cat.id !== 'all' && cat.id !== 'trash')
+    // ゴミ箱以外のカテゴリを表示順に並べる
+    const visibleCategories = categories.filter((cat) => cat.id !== 'trash')
 
     return visibleCategories
       .map((category) => {
         const categoryClips = displayClips
           .filter((clip) => clip.categoryId === category.id)
           .sort(compareReceivedAtDesc)
-          .slice(0, CLIPS_PER_PAGE)
         return { category, clips: categoryClips }
       })
       .filter((group) => group.clips.length > 0)
@@ -496,16 +510,24 @@ function App() {
   // カテゴリ選択時の処理
   const handleSelectCategory = (categoryId: string) => {
     setSelectedCategoryId(categoryId)
+    // カテゴリ切り替え時はページを先頭に戻す
+    setCurrentPage(1)
   }
 
   // 検索クエリ変更時の処理
   const handleSearchChange = (query: string) => {
     setSearchQuery(query)
+    // 検索条件変更時は通常ページ・カテゴリ別ページを先頭に戻す
+    setCurrentPage(1)
+    setCategoryPages({})
   }
 
   // 並び替えモード変更時の処理
   const handleSortChange = (mode: SortMode) => {
     setSortMode(mode)
+    // 並び替え切り替え時は通常ページ・カテゴリ別ページを先頭に戻す
+    setCurrentPage(1)
+    setCategoryPages({})
   }
 
   // 表示モード変更時の処理
@@ -856,9 +878,9 @@ function App() {
             : clip,
         ),
       )
-      // 選択中のカテゴリが削除された場合は「すべてのクリップ」に戻す
+      // 選択中のカテゴリが削除された場合は「未分類」に戻す
       if (selectedCategoryId === categoryId) {
-        setSelectedCategoryId('all')
+        setSelectedCategoryId('others')
       }
     } catch (err) {
       console.error('カテゴリ削除失敗:', err)
@@ -874,7 +896,7 @@ function App() {
       setTrashClips([])
       setCategories([])
       setSourceSites([])
-      setSelectedCategoryId('all')
+      setSelectedCategoryId('others')
       setSearchQuery('')
     } catch (err) {
       console.error('ログアウト失敗:', err)
@@ -985,21 +1007,35 @@ function App() {
                   : 'このカテゴリにはクリップがありません。'}
             </p>
           ) : sortMode === 'category' && selectedCategoryId !== 'trash' ? (
-            // カテゴリ別モード：カテゴリごとにグループ化して表示
-            categoryGroups.map(({ category, clips: groupClips }) => (
-              <ClipGrid
-                key={category.id}
-                title={category.name}
-                clips={groupClips}
-                categories={categories}
-                viewMode={viewMode}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-                onTogglePin={handleTogglePin}
-                onToggleCheck={handleToggleCheck}
-                onUpdateComment={handleUpdateComment}
-              />
-            ))
+            // カテゴリ別モード：カテゴリごとにグループ化して表示（各カテゴリ20件ずつページネーション）
+            categoryGroups.map(({ category, clips: groupClips }) => {
+              const categoryPage = categoryPages[category.id] ?? 1
+              const categoryTotalPages = Math.max(
+                1,
+                Math.ceil(groupClips.length / CLIPS_PER_PAGE),
+              )
+              const start = (categoryPage - 1) * CLIPS_PER_PAGE
+              const pagedGroupClips = groupClips.slice(start, start + CLIPS_PER_PAGE)
+              return (
+                <ClipGrid
+                  key={category.id}
+                  title={category.name}
+                  clips={pagedGroupClips}
+                  categories={categories}
+                  viewMode={viewMode}
+                  currentPage={categoryPage}
+                  totalPages={categoryTotalPages}
+                  onPageChange={(page) =>
+                    setCategoryPages((prev) => ({ ...prev, [category.id]: page }))
+                  }
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onTogglePin={handleTogglePin}
+                  onToggleCheck={handleToggleCheck}
+                  onUpdateComment={handleUpdateComment}
+                />
+              )
+            })
           ) : (
             <>
               {selectedCategoryId === 'today' ? (
@@ -1015,32 +1051,22 @@ function App() {
                   onUpdateComment={handleUpdateComment}
                 />
               ) : (
-                <>
-                  <ClipGrid
-                    title="ピン留め"
-                    clips={pinnedClips}
-                    categories={categories}
-                    viewMode={viewMode}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                    onTogglePin={handleTogglePin}
-                    onToggleCheck={handleToggleCheck}
-                    onUpdateComment={handleUpdateComment}
-                  />
-                  <ClipGrid
-                    title={selectedCategoryId === 'trash' ? 'ゴミ箱' : 'クリップ'}
-                    clips={normalClips}
-                    categories={categories}
-                    isTrash={selectedCategoryId === 'trash'}
-                    viewMode={viewMode}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                    onTogglePin={handleTogglePin}
-                    onToggleCheck={handleToggleCheck}
-                    onUpdateComment={handleUpdateComment}
-                    onRestore={handleRestoreClip}
-                  />
-                </>
+                <ClipGrid
+                  title={selectedCategoryId === 'trash' ? 'ゴミ箱' : 'クリップ'}
+                  clips={paginatedClips}
+                  categories={categories}
+                  isTrash={selectedCategoryId === 'trash'}
+                  viewMode={viewMode}
+                  currentPage={selectedCategoryId === 'trash' ? undefined : currentPage}
+                  totalPages={selectedCategoryId === 'trash' ? undefined : totalPages}
+                  onPageChange={selectedCategoryId === 'trash' ? undefined : setCurrentPage}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onTogglePin={handleTogglePin}
+                  onToggleCheck={handleToggleCheck}
+                  onUpdateComment={handleUpdateComment}
+                  onRestore={handleRestoreClip}
+                />
               )}
             </>
           )}
