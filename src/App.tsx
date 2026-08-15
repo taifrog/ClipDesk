@@ -1,5 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
+
+// 画面幅が768px以下かどうかを検知するカスタムフック
+// スマホレイアウトの切り替えに使用する
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia('(max-width: 768px)').matches
+  })
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 768px)')
+    const handleChange = (event: MediaQueryListEvent) => {
+      setIsMobile(event.matches)
+    }
+    mediaQuery.addEventListener('change', handleChange)
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange)
+    }
+  }, [])
+
+  return isMobile
+}
 import { ClipGrid } from './components/ClipGrid'
 import { CollectDialog } from './components/CollectDialog'
 import { Header } from './components/Header'
@@ -92,6 +114,9 @@ function normalizeApiSourceSite(raw: Record<string, unknown>): SourceSite {
 }
 
 function App() {
+  // 現在の画面幅がスマホサイズ（768px以下）かどうか
+  const isMobile = useIsMobile()
+
   // 現在の認証セッション
   const [session, setSession] = useState<Session | null>(null)
   // 認証状態の初期確認中フラグ
@@ -520,6 +545,32 @@ function App() {
     setCurrentPage(1)
   }
 
+  // クリップのカテゴリを変更する（スマホ用セレクトなどから呼ばれる）
+  // categoryId が 'trash' の場合はゴミ箱へ移動する
+  const handleChangeCategory = async (clipId: number, categoryId: string) => {
+    if (categoryId === 'trash') {
+      try {
+        const response = await fetch(`${FUNCTIONS_BASE}/clips/${clipId}/trash`, {
+          method: 'PATCH',
+          headers: getAuthHeaders(false),
+        })
+        if (!response.ok) {
+          throw new Error('ゴミ箱への移動に失敗しました')
+        }
+        const movedClip = clips.find((c) => c.id === clipId)
+        if (movedClip) {
+          setClips((prev) => prev.filter((clip) => clip.id !== clipId))
+          setTrashClips((prev) => [{ ...movedClip, deletedAt: new Date().toISOString() }, ...prev])
+        }
+      } catch (err) {
+        console.error('ゴミ箱移動失敗:', err)
+      }
+      return
+    }
+
+    await updateClip(clipId, { categoryId })
+  }
+
   // 検索クエリ変更時の処理
   const handleSearchChange = (query: string) => {
     setSearchQuery(query)
@@ -944,6 +995,7 @@ function App() {
 
   return (
     <div className="app-layout">
+      {!isMobile && (
         <Sidebar
           categories={categories}
           clips={clips}
@@ -953,14 +1005,15 @@ function App() {
           cleanupCount={cleanupCount}
           todayCount={todayCount}
           onSelectCategory={handleSelectCategory}
-        onDropToCategory={handleDropToCategory}
-        onAddCategory={handleAddCategory}
-        onCollectClips={handleOpenCollectDialog}
-        onCleanupClips={handleCleanupClips}
-        onOpenSettings={handleOpenSettings}
-        onRenameCategory={handleRenameCategory}
-        onDeleteCategory={handleDeleteCategory}
-      />
+          onDropToCategory={handleDropToCategory}
+          onAddCategory={handleAddCategory}
+          onCollectClips={handleOpenCollectDialog}
+          onCleanupClips={handleCleanupClips}
+          onOpenSettings={handleOpenSettings}
+          onRenameCategory={handleRenameCategory}
+          onDeleteCategory={handleDeleteCategory}
+        />
+      )}
 
       <CollectDialog
         isOpen={isCollectDialogOpen}
@@ -999,6 +1052,10 @@ function App() {
           onSortChange={handleSortChange}
           viewMode={viewMode}
           onViewChange={handleViewChange}
+          categories={categories}
+          selectedCategoryId={selectedCategoryId}
+          onSelectCategory={handleSelectCategory}
+          isMobile={isMobile}
         />
 
         <div className="clip-content">
@@ -1039,6 +1096,7 @@ function App() {
                   onTogglePin={handleTogglePin}
                   onToggleCheck={handleToggleCheck}
                   onUpdateComment={handleUpdateComment}
+                  onChangeCategory={handleChangeCategory}
                 />
               )
             })
@@ -1055,6 +1113,7 @@ function App() {
                   onTogglePin={handleTogglePin}
                   onToggleCheck={handleToggleCheck}
                   onUpdateComment={handleUpdateComment}
+                  onChangeCategory={handleChangeCategory}
                 />
               ) : (
                 <ClipGrid
@@ -1072,6 +1131,7 @@ function App() {
                   onToggleCheck={handleToggleCheck}
                   onUpdateComment={handleUpdateComment}
                   onRestore={handleRestoreClip}
+                  onChangeCategory={handleChangeCategory}
                 />
               )}
             </>

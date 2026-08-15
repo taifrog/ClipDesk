@@ -2,7 +2,7 @@
 // メインエリア上部に表示されるタイトル、検索、ビュー切り替え、並び替えを提供する
 
 import { useEffect, useRef, useState } from 'react'
-import type { SortMode, ViewMode } from '../types'
+import type { Category, SortMode, ViewMode } from '../types'
 
 interface HeaderProps {
   title: string
@@ -13,6 +13,10 @@ interface HeaderProps {
   onSortChange: (mode: SortMode) => void
   viewMode: ViewMode
   onViewChange: (mode: ViewMode) => void
+  categories: Category[]
+  selectedCategoryId: string
+  onSelectCategory: (categoryId: string) => void
+  isMobile: boolean
 }
 
 // 並び替えモードの表示ラベル
@@ -47,7 +51,20 @@ function SmallIcon({ name }: { name: string }) {
   )
 }
 
-export function Header({ title, count, searchQuery, onSearchChange, sortMode, onSortChange, viewMode, onViewChange }: HeaderProps) {
+export function Header({
+  title,
+  count,
+  searchQuery,
+  onSearchChange,
+  sortMode,
+  onSortChange,
+  viewMode,
+  onViewChange,
+  categories,
+  selectedCategoryId,
+  onSelectCategory,
+  isMobile,
+}: HeaderProps) {
   // 並び替えドロップダウンの開閉状態
   const [isSortOpen, setIsSortOpen] = useState(false)
   // ドロップダウンのDOM参照（外側クリック判定用）
@@ -75,9 +92,32 @@ export function Header({ title, count, searchQuery, onSearchChange, sortMode, on
     setIsSortOpen(false)
   }
 
+  // カテゴリ選択用の論理カテゴリも含めた選択肢を作成する
+  const categoryOptions = [
+    { id: 'today', name: '新規クリップ' },
+    { id: 'others', name: '未分類' },
+    ...categories.filter((cat) => cat.id !== 'others'),
+    { id: 'trash', name: 'ゴミ箱' },
+  ]
+
   return (
     <header className="main-header">
       <div className="header-title-area">
+        {isMobile && (
+          <div className="header-category-select">
+            <select
+              aria-label="カテゴリを選択"
+              value={selectedCategoryId}
+              onChange={(e) => onSelectCategory(e.target.value)}
+            >
+              {categoryOptions.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <h2 className="header-title">{title}</h2>
         <span className="header-count">{count}件のクリップ</span>
       </div>

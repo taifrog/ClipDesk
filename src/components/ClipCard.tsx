@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Category, Clip, ViewMode } from '../types'
 
 // ClipCard コンポーネントのプロパティ
 interface ClipCardProps {
   clip: Clip
   category: Category | undefined
+  categories: Category[]
   viewMode: ViewMode
   isTrash?: boolean
   onDragStart: (clipId: number) => void
@@ -13,6 +14,7 @@ interface ClipCardProps {
   onToggleCheck: (id: number) => void
   onUpdateComment: (id: number, comment: string) => void
   onRestore?: (id: number) => void
+  onChangeCategory?: (id: number, categoryId: string) => void
 }
 
 // 日付文字列を日本語の表示形式に変換する
@@ -69,6 +71,7 @@ function CheckIcon({ active }: { active: boolean }) {
 export function ClipCard({
   clip,
   category,
+  categories,
   viewMode,
   isTrash = false,
   onDragStart,
@@ -77,11 +80,29 @@ export function ClipCard({
   onToggleCheck,
   onUpdateComment,
   onRestore,
+  onChangeCategory,
 }: ClipCardProps) {
   // コメント編集モードの表示状態
   const [isEditingComment, setIsEditingComment] = useState(false)
   // 編集中のコメントテキスト
   const [commentDraft, setCommentDraft] = useState(clip.comment)
+  // 画面幅がスマホサイズ（768px以下）かどうか
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia('(max-width: 768px)').matches
+  })
+
+  // 画面幅の変化を監視する
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 768px)')
+    const handleChange = (event: MediaQueryListEvent) => {
+      setIsMobile(event.matches)
+    }
+    mediaQuery.addEventListener('change', handleChange)
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange)
+    }
+  }, [])
 
   // ピン切り替えボタンクリック時
   const handlePinClick = () => {
@@ -156,8 +177,26 @@ export function ClipCard({
       {/* カードフッター */}
       <div className={`clip-card-footer ${viewMode === 'list' ? 'clip-card-footer-list' : ''}`}>
         <div className="clip-card-meta">
-          {category && category.id !== 'all' && (
-            <span className="clip-card-category">{category.name}</span>
+          {isMobile && !isTrash && onChangeCategory ? (
+            <select
+              className="clip-card-category-select"
+              aria-label="カテゴリを変更"
+              value={clip.categoryId}
+              onChange={(e) => onChangeCategory(clip.id, e.target.value)}
+            >
+              {categories
+                .filter((cat) => cat.id !== 'trash')
+                .map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              <option value="trash">ゴミ箱</option>
+            </select>
+          ) : (
+            category && category.id !== 'all' && (
+              <span className="clip-card-category">{category.name}</span>
+            )
           )}
           <span className="clip-card-date">{formatDate(clip.receivedAt)}</span>
         </div>

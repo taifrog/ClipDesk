@@ -850,6 +850,45 @@
   }
 }
 
+/* ヘッダー内のカテゴリ選択（スマホ用） */
+.header-category-select {
+  width: 100%;
+}
+
+.header-category-select select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-h);
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+}
+
+.header-category-select select:focus {
+  border-color: var(--accent);
+}
+
+/* クリップカード内のカテゴリ選択（スマホ用） */
+.clip-card-category-select {
+  padding: 2px 8px;
+  border: 1px solid var(--accent-border);
+  border-radius: 4px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  max-width: 100%;
+}
+
+.clip-card-category-select:focus {
+  border-color: var(--accent);
+}
+
 /* レスポンシブ対応 */
 @media (max-width: 1200px) {
   .clip-grid {
@@ -911,6 +950,43 @@
 
   .clip-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .app-layout {
+    flex-direction: column;
+  }
+
+  .main-content {
+    padding: 16px;
+  }
+
+  .main-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .header-title-area {
+    width: 100%;
+    gap: 8px;
+  }
+
+  .header-title {
+    font-size: 20px;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .search-box input {
+    width: 120px;
+  }
+
+  .clip-grid {
+    grid-template-columns: 1fr;
   }
 }
 

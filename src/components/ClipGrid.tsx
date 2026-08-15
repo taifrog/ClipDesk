@@ -18,6 +18,7 @@ interface ClipGridProps {
   onToggleCheck: (id: number) => void
   onUpdateComment: (id: number, comment: string) => void
   onRestore?: (id: number) => void
+  onChangeCategory?: (id: number, categoryId: string) => void
 }
 
 // カテゴリIDからカテゴリ情報を取得する
@@ -41,6 +42,7 @@ export function ClipGrid({
   onToggleCheck,
   onUpdateComment,
   onRestore,
+  onChangeCategory,
 }: ClipGridProps) {
   if (clips.length === 0) {
     return null
@@ -71,6 +73,7 @@ export function ClipGrid({
             key={clip.id}
             clip={clip}
             category={findCategory(categories, clip.categoryId)}
+            categories={categories}
             viewMode={viewMode}
             isTrash={isTrash}
             onDragStart={onDragStart}
@@ -79,6 +82,7 @@ export function ClipGrid({
             onToggleCheck={onToggleCheck}
             onUpdateComment={onUpdateComment}
             onRestore={onRestore}
+            onChangeCategory={onChangeCategory}
           />
         ))}
       </div>
