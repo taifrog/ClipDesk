@@ -5,7 +5,7 @@
 import { corsHeaders, handleCors } from '../_shared/cors.ts'
 import { getServiceClient, getUserClient, getJwt } from '../_shared/supabase.ts'
 import { getAppSettings } from '../_shared/settings.ts'
-import { summarizeWithOpenCodeGo } from '../_shared/ai.ts'
+import { summarizeWithOpenCodeGo, type AiSummaryResult } from '../_shared/ai.ts'
 import { collectArticlesFromSite } from '../_shared/rss.ts'
 
 interface CollectBody {
@@ -212,12 +212,18 @@ Deno.serve(async (req) => {
       }
 
       let summary = article.summary || ''
+      let eventStartDate: string | null = null
+      let eventEndDate: string | null = null
+      let location: string | null = null
 
       // AI要約が有効で API キーがあれば要約を生成する
       if (aiSettings.enabled && aiSettings.apiKey && summary) {
         try {
-          const aiSummary = await summarizeWithOpenCodeGo(summary, article.title, aiSettings)
-          if (aiSummary) summary = aiSummary
+          const aiResult: AiSummaryResult = await summarizeWithOpenCodeGo(summary, article.title, aiSettings)
+          if (aiResult.summary) summary = aiResult.summary
+          eventStartDate = aiResult.eventStartDate
+          eventEndDate = aiResult.eventEndDate
+          location = aiResult.location
         } catch (err) {
           const message = err instanceof Error ? err.message : '不明なエラー'
           debug(`AI要約失敗: ${article.url} - ${message}`)
@@ -233,6 +239,9 @@ Deno.serve(async (req) => {
           summary,
           raw_body: '',
           category_id: categoryId,
+          event_start_date: eventStartDate,
+          event_end_date: eventEndDate,
+          location,
           is_pinned: false,
           is_checked: false,
           comment: '',

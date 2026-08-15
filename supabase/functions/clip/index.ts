@@ -3,7 +3,7 @@
 
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { getServiceClient, getApiKey, getJwt, resolveUserIdByApiKey, resolveUserIdByJwt } from '../_shared/supabase.ts';
-import { summarizeWithOpenCodeGo } from '../_shared/ai.ts';
+import { summarizeWithOpenCodeGo, type AiSummaryResult } from '../_shared/ai.ts';
 import { getAppSettings } from '../_shared/settings.ts';
 import { fetchPageText } from '../_shared/fetchPage.ts';
 
@@ -109,10 +109,18 @@ Deno.serve(async (req) => {
     }
   }
 
+  // イベント情報の抽出結果を保持する変数
+  let eventStartDate: string | null = null;
+  let eventEndDate: string | null = null;
+  let location: string | null = null;
+
   if (!finalSummary && finalRawBody && aiSettings.enabled && aiSettings.apiKey) {
     try {
-      const aiSummary = await summarizeWithOpenCodeGo(finalRawBody, title, aiSettings);
-      if (aiSummary) finalSummary = aiSummary;
+      const aiResult: AiSummaryResult = await summarizeWithOpenCodeGo(finalRawBody, title, aiSettings);
+      if (aiResult.summary) finalSummary = aiResult.summary;
+      eventStartDate = aiResult.eventStartDate;
+      eventEndDate = aiResult.eventEndDate;
+      location = aiResult.location;
     } catch (err) {
       aiSummaryError = err instanceof Error ? err.message : '不明なエラー';
       debug(`AI要約失敗: ${aiSummaryError}`);
@@ -148,6 +156,9 @@ Deno.serve(async (req) => {
       is_pinned: false,
       is_checked: false,
       comment: comment || '',
+      event_start_date: eventStartDate,
+      event_end_date: eventEndDate,
+      location,
     })
     .select()
     .single();

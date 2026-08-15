@@ -17,6 +17,7 @@ interface ClipGridProps {
   onTogglePin: (id: number) => void
   onToggleCheck: (id: number) => void
   onUpdateComment: (id: number, comment: string) => void
+  onUpdateEventInfo?: (id: number, eventInfo: { eventStartDate?: string | null; eventEndDate?: string | null; location?: string | null }) => void
   onRestore?: (id: number) => void
   onChangeCategory?: (id: number, categoryId: string) => void
 }
@@ -41,6 +42,7 @@ export function ClipGrid({
   onTogglePin,
   onToggleCheck,
   onUpdateComment,
+  onUpdateEventInfo,
   onRestore,
   onChangeCategory,
 }: ClipGridProps) {
@@ -81,6 +83,7 @@ export function ClipGrid({
             onTogglePin={onTogglePin}
             onToggleCheck={onToggleCheck}
             onUpdateComment={onUpdateComment}
+            onUpdateEventInfo={onUpdateEventInfo}
             onRestore={onRestore}
             onChangeCategory={onChangeCategory}
           />

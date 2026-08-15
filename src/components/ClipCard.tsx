@@ -13,6 +13,7 @@ interface ClipCardProps {
   onTogglePin: (id: number) => void
   onToggleCheck: (id: number) => void
   onUpdateComment: (id: number, comment: string) => void
+  onUpdateEventInfo?: (id: number, eventInfo: { eventStartDate?: string | null; eventEndDate?: string | null; location?: string | null }) => void
   onRestore?: (id: number) => void
   onChangeCategory?: (id: number, categoryId: string) => void
 }
@@ -25,6 +26,23 @@ function formatDate(isoString: string): string {
     month: '2-digit',
     day: '2-digit',
   })
+}
+
+// ISO 8601 日時文字列を datetime-local 入力用の "YYYY-MM-DDTHH:MM" 形式に変換する
+function toDatetimeLocalValue(isoString: string | null | undefined): string {
+  if (!isoString) return ''
+  const date = new Date(isoString)
+  if (isNaN(date.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+// datetime-local 入力値を ISO 8601 (+09:00) 形式に変換する
+function fromDatetimeLocalValue(value: string): string | null {
+  if (!value) return null
+  const date = new Date(value)
+  if (isNaN(date.getTime())) return null
+  return date.toISOString().replace('Z', '+09:00')
 }
 
 // お気に入りアイコン（星）を表示するコンポーネント
@@ -79,6 +97,7 @@ export function ClipCard({
   onTogglePin,
   onToggleCheck,
   onUpdateComment,
+  onUpdateEventInfo,
   onRestore,
   onChangeCategory,
 }: ClipCardProps) {
@@ -86,6 +105,14 @@ export function ClipCard({
   const [isEditingComment, setIsEditingComment] = useState(false)
   // 編集中のコメントテキスト
   const [commentDraft, setCommentDraft] = useState(clip.comment)
+  // イベント情報編集モードの表示状態
+  const [isEditingEventInfo, setIsEditingEventInfo] = useState(false)
+  // 編集中のイベント開始日時
+  const [eventStartDateDraft, setEventStartDateDraft] = useState(toDatetimeLocalValue(clip.eventStartDate))
+  // 編集中のイベント終了日時
+  const [eventEndDateDraft, setEventEndDateDraft] = useState(toDatetimeLocalValue(clip.eventEndDate))
+  // 編集中のイベント場所
+  const [locationDraft, setLocationDraft] = useState(clip.location || '')
   // 画面幅がスマホサイズ（768px以下）かどうか
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -126,6 +153,27 @@ export function ClipCard({
     setIsEditingComment(false)
   }
 
+  // イベント情報の編集を確定する
+  const handleEventInfoSave = () => {
+    onUpdateEventInfo?.(clip.id, {
+      eventStartDate: fromDatetimeLocalValue(eventStartDateDraft),
+      eventEndDate: fromDatetimeLocalValue(eventEndDateDraft),
+      location: locationDraft.trim() || null,
+    })
+    setIsEditingEventInfo(false)
+  }
+
+  // イベント情報の編集をキャンセルする
+  const handleEventInfoCancel = () => {
+    setEventStartDateDraft(toDatetimeLocalValue(clip.eventStartDate))
+    setEventEndDateDraft(toDatetimeLocalValue(clip.eventEndDate))
+    setLocationDraft(clip.location || '')
+    setIsEditingEventInfo(false)
+  }
+
+  // イベント情報があるかどうか
+  const hasEventInfo = Boolean(clip.eventStartDate || clip.eventEndDate || clip.location)
+
   return (
     <article
       className={`clip-card ${viewMode === 'list' ? 'clip-card-list' : ''}`}
@@ -142,6 +190,69 @@ export function ClipCard({
         </h3>
         <p className="clip-card-summary">{clip.summary}</p>
       </div>
+
+      {/* イベント情報エリア */}
+      {isEditingEventInfo ? (
+        <div className={`clip-card-event-edit ${viewMode === 'list' ? 'clip-card-event-edit-list' : ''}`}>
+          <label>
+            開始日時
+            <input
+              type="datetime-local"
+              value={eventStartDateDraft}
+              onChange={(e) => setEventStartDateDraft(e.target.value)}
+            />
+          </label>
+          <label>
+            終了日時
+            <input
+              type="datetime-local"
+              value={eventEndDateDraft}
+              onChange={(e) => setEventEndDateDraft(e.target.value)}
+            />
+          </label>
+          <label>
+            場所
+            <input
+              type="text"
+              value={locationDraft}
+              onChange={(e) => setLocationDraft(e.target.value)}
+              placeholder="会場名・住所など"
+            />
+          </label>
+          <div className="clip-card-event-actions">
+            <button type="button" className="event-save" onClick={handleEventInfoSave}>
+              保存
+            </button>
+            <button type="button" className="event-cancel" onClick={handleEventInfoCancel}>
+              キャンセル
+            </button>
+          </div>
+        </div>
+      ) : hasEventInfo ? (
+        <button
+          type="button"
+          className={`clip-card-event-info ${viewMode === 'list' ? 'clip-card-event-info-list' : ''}`}
+          onClick={() => setIsEditingEventInfo(true)}
+          aria-label="イベント情報を編集"
+        >
+          {clip.eventStartDate && (
+            <span className="event-date">
+              📅 {formatDate(clip.eventStartDate)}
+              {clip.eventEndDate && clip.eventEndDate !== clip.eventStartDate && ` 〜 ${formatDate(clip.eventEndDate)}`}
+            </span>
+          )}
+          {clip.location && <span className="event-location">📍 {clip.location}</span>}
+        </button>
+      ) : (
+        <button
+          type="button"
+          className={`clip-card-event-add ${viewMode === 'list' ? 'clip-card-event-add-list' : ''}`}
+          onClick={() => setIsEditingEventInfo(true)}
+          aria-label="イベント情報を追加"
+        >
+          + イベント情報を追加
+        </button>
+      )}
 
       {/* コメント編集エリア：コメントがある場合、または編集モードの場合のみ表示する */}
       {isEditingComment ? (

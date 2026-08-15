@@ -18,6 +18,12 @@ export interface Clip {
   deletedAt?: string | null
   // 確認済みチェックマークをONにした日時（null の場合は未確認）
   checkedAt?: string | null
+  // イベント・展示などの開始日時（null の場合はイベント情報なし）
+  eventStartDate?: string | null
+  // イベント・展示などの終了日時（null の場合は終了日時不明またはイベント情報なし）
+  eventEndDate?: string | null
+  // イベント・展示などの開催場所（null の場合は場所不明またはイベント情報なし）
+  location?: string | null
 }
 
 // カテゴリ1件を表す型

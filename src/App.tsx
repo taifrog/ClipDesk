@@ -66,6 +66,9 @@ function normalizeApiClip(raw: Record<string, unknown>): Clip {
     receivedAt: String(raw.received_at),
     deletedAt: raw.deleted_at ? String(raw.deleted_at) : null,
     checkedAt: raw.checked_at ? String(raw.checked_at) : null,
+    eventStartDate: raw.event_start_date ? String(raw.event_start_date) : null,
+    eventEndDate: raw.event_end_date ? String(raw.event_end_date) : null,
+    location: raw.location ? String(raw.location) : null,
   }
 }
 
@@ -594,7 +597,7 @@ function App() {
 
   // クリップ情報を Edge Functions 経由で更新する
   // 成功したらローカル状態も同期する
-  const updateClip = async (id: number, updates: Partial<Pick<Clip, 'categoryId' | 'isPinned' | 'isChecked' | 'comment'>>) => {
+  const updateClip = async (id: number, updates: Partial<Pick<Clip, 'categoryId' | 'isPinned' | 'isChecked' | 'comment' | 'eventStartDate' | 'eventEndDate' | 'location'>>) => {
     try {
       // フロントエンドの camelCase プロパティを API の snake_case に変換する
       const body: Record<string, unknown> = {}
@@ -602,6 +605,9 @@ function App() {
       if ('isPinned' in updates) body.is_pinned = updates.isPinned
       if ('isChecked' in updates) body.is_checked = updates.isChecked
       if ('comment' in updates) body.comment = updates.comment
+      if ('eventStartDate' in updates) body.event_start_date = updates.eventStartDate
+      if ('eventEndDate' in updates) body.event_end_date = updates.eventEndDate
+      if ('location' in updates) body.location = updates.location
 
       const response = await fetch(`${FUNCTIONS_BASE}/clips/${id}`, {
         method: 'PATCH',
@@ -692,6 +698,18 @@ function App() {
   // コメント更新時の処理
   const handleUpdateComment = async (id: number, comment: string) => {
     await updateClip(id, { comment })
+  }
+
+  // イベント情報更新時の処理
+  const handleUpdateEventInfo = async (
+    id: number,
+    eventInfo: { eventStartDate?: string | null; eventEndDate?: string | null; location?: string | null },
+  ) => {
+    await updateClip(id, {
+      eventStartDate: eventInfo.eventStartDate,
+      eventEndDate: eventInfo.eventEndDate,
+      location: eventInfo.location,
+    })
   }
 
   // カテゴリ追加時の処理（簡易的にプロンプト入力）
@@ -1096,6 +1114,7 @@ function App() {
                   onTogglePin={handleTogglePin}
                   onToggleCheck={handleToggleCheck}
                   onUpdateComment={handleUpdateComment}
+                  onUpdateEventInfo={handleUpdateEventInfo}
                   onChangeCategory={handleChangeCategory}
                 />
               )
@@ -1113,6 +1132,7 @@ function App() {
                   onTogglePin={handleTogglePin}
                   onToggleCheck={handleToggleCheck}
                   onUpdateComment={handleUpdateComment}
+                  onUpdateEventInfo={handleUpdateEventInfo}
                   onChangeCategory={handleChangeCategory}
                 />
               ) : (
@@ -1130,6 +1150,7 @@ function App() {
                   onTogglePin={handleTogglePin}
                   onToggleCheck={handleToggleCheck}
                   onUpdateComment={handleUpdateComment}
+                  onUpdateEventInfo={handleUpdateEventInfo}
                   onRestore={handleRestoreClip}
                   onChangeCategory={handleChangeCategory}
                 />
