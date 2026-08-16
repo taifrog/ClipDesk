@@ -198,9 +198,9 @@ export function SettingsDialog({
   const shareTargetUrl = useMemo(() => {
     if (!newlyCreatedKey) return ''
     const siteUrl = import.meta.env.VITE_SITE_URL || window.location.origin + '/ClipDesk/'
-    // 末尾のスラッシュを正規化し、share-target パスを結合する
+    // 末尾のスラッシュを正規化し、share パスを結合する（Service Worker / Manifest と一致）
     const base = siteUrl.replace(/\/$/, '')
-    return `${base}/share-target?apiKey=${encodeURIComponent(newlyCreatedKey)}`
+    return `${base}/share?apiKey=${encodeURIComponent(newlyCreatedKey)}`
   }, [newlyCreatedKey])
 
   // QRコード画像を生成する

@@ -67,6 +67,20 @@ function extractMainText(html: string): string {
   return stripHtmlTags(bodyMatch ? bodyMatch[1] : html);
 }
 
+// fetch 用のタイムアウト signal を作成する
+// Deno/Supabase Edge Functions の一部環境で AbortSignal.timeout が未対応のため、
+// AbortController + setTimeout で互換性を保つ
+// @param ms タイムアウト時間（ミリ秒）
+// @returns AbortSignal
+function createTimeoutSignal(ms: number): AbortSignal {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ms);
+  // リクエスト完了後にタイマーをクリアするため、signal にハンドラを付加する
+  const cleanup = () => clearTimeout(timeoutId);
+  controller.signal.addEventListener('abort', cleanup, { once: true });
+  return controller.signal;
+}
+
 // URLからHTMLを取得し、要約用のテキストを抽出する
 // @param url 取得対象のURL
 // @returns 抽出された本文テキスト。取得失敗やHTMLでない場合は null
@@ -74,7 +88,7 @@ export async function fetchPageText(url: string): Promise<string | null> {
   try {
     const response = await fetch(url, {
       method: 'GET',
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      signal: createTimeoutSignal(FETCH_TIMEOUT_MS),
       headers: {
         // 一部サイトは UA がないとブロックするため、一般的なブラウザの UA を設定
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
