@@ -131,8 +131,8 @@ function App() {
   // カテゴリ一覧の状態
   const [categories, setCategories] = useState<Category[]>([])
   // 選択中のカテゴリID
-  // デフォルトは未分類とする（all は廃止）
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('others')
+  // デフォルトは「新規クリップ」とする（all は廃止）
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('today')
   // ドラッグ中のクリップID
   const [draggingClipId, setDraggingClipId] = useState<number | null>(null)
   // データ読み込み中フラグ
@@ -953,9 +953,9 @@ function App() {
             : clip,
         ),
       )
-      // 選択中のカテゴリが削除された場合は「未分類」に戻す
+      // 選択中のカテゴリが削除された場合は「新規クリップ」に戻す
       if (selectedCategoryId === categoryId) {
-        setSelectedCategoryId('others')
+        setSelectedCategoryId('today')
       }
     } catch (err) {
       console.error('カテゴリ削除失敗:', err)
@@ -971,7 +971,7 @@ function App() {
       setTrashClips([])
       setCategories([])
       setSourceSites([])
-      setSelectedCategoryId('others')
+      setSelectedCategoryId('today')
       setSearchQuery('')
     } catch (err) {
       console.error('ログアウト失敗:', err)

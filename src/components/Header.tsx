@@ -170,7 +170,7 @@ export function Header({
           </button>
 
           {isSortOpen && (
-            <ul className="sort-dropdown-menu" role="listbox" aria-label="並び替えオプション">
+            <ul className={`sort-dropdown-menu ${isMobile ? 'sort-dropdown-menu-mobile' : ''}`} role="listbox" aria-label="並び替えオプション">
               {SORT_OPTIONS.map((option) => (
                 <li key={option.value} role="presentation">
                   <button

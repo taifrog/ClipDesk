@@ -53,8 +53,8 @@ export default function ShareTargetPage() {
   const [categories, setCategories] = useState<Category[]>([])
   // カテゴリ読み込み中フラグ
   const [isLoadingCategories, setIsLoadingCategories] = useState(false)
-  // 選択中のカテゴリID
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('others')
+  // 選択中のカテゴリID（デフォルトは新規クリップ）
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('today')
   // コメント入力
   const [comment, setComment] = useState('')
   // API キー入力
@@ -264,6 +264,19 @@ export default function ShareTargetPage() {
           setResultMessage('この URL は既に登録されています')
         } else {
           setResultMessage('クリップを登録しました')
+        }
+
+        // 登録成功後、共有元画面に戻る
+        // PWA/ブラウザによって window.close() がブロックされるため、フォールバックを用意する
+        const sharedUrl = sharedData.url
+        if (typeof window !== 'undefined') {
+          window.setTimeout(() => {
+            if (sharedUrl) {
+              window.location.href = sharedUrl
+            } else {
+              window.history.back()
+            }
+          }, 300)
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'クリップ登録に失敗しました'

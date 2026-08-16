@@ -43,8 +43,9 @@
 }
 
 /* クリップ追加ボタン */
+/* クリップ収集機能は Supabase フェッチ制限等の問題で当面非表示とする */
 .add-clip-button {
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   gap: 8px;
@@ -466,6 +467,13 @@
   border-radius: 8px;
   box-shadow: var(--shadow);
   z-index: 100;
+}
+
+/* スマホ版の並び替えドロップダウンは左端揃えにして画面からはみ出さないようにする */
+.sort-dropdown-menu-mobile {
+  left: 0;
+  right: auto;
+  min-width: 180px;
 }
 
 .sort-dropdown-item {
