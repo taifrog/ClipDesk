@@ -1724,3 +1724,37 @@
   background: #fee2e2;
   color: #991b1b;
 }
+
+/* 診断情報表示（要約/日付/場所の取得状況確認用） */
+.diagnostics-details {
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated, var(--bg));
+  font-size: 13px;
+}
+
+.diagnostics-details summary {
+  cursor: pointer;
+  color: var(--text-h);
+  font-weight: 500;
+}
+
+.diagnostics-list {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 6px 12px;
+  margin: 12px 0 0;
+}
+
+.diagnostics-list dt {
+  color: var(--text-muted, var(--text));
+  font-weight: 500;
+}
+
+.diagnostics-list dd {
+  margin: 0;
+  word-break: break-all;
+  color: var(--text);
+}

@@ -121,8 +121,29 @@ Deno.serve(async (req) => {
   let eventEndDate: string | null = null;
   let location: string | null = null;
 
+  // 診断情報を保持する（レスポンスに含めてフロントエンドでの確認を容易にする）
+  const diagnostics = {
+    aiEnabled: aiSettings.enabled,
+    hasApiKey: Boolean(aiSettings.apiKey),
+    model: aiSettings.model,
+    originalRawBodyLength: (rawBody || '').length,
+    originalTextLength: (text || '').length,
+    aiInputTextLength: aiInputText.length,
+    fetchedPageTextLength: finalRawBody.length,
+    fetchPageTextUsed: aiInputText.length < MIN_AI_INPUT_LENGTH && url && aiSettings.enabled && aiSettings.apiKey,
+    fetchPageTextSucceeded: finalRawBody.length > 0 && finalRawBody !== (rawBody || '') && finalRawBody !== (text || ''),
+    aiAttempted: false,
+    aiSkippedReason: null as string | null,
+    aiSummaryError: null as string | null,
+    aiResultSummaryLength: 0,
+    aiResultEventStartDate: null as string | null,
+    aiResultEventEndDate: null as string | null,
+    aiResultLocation: null as string | null,
+  };
+
   // 要約が未設定で、AI 入力テキストが存在し、AI 設定が有効な場合に要約・イベント情報を抽出する
   if (!finalSummary && aiInputText && aiSettings.enabled && aiSettings.apiKey) {
+    diagnostics.aiAttempted = true;
     try {
       debug(`AI 要約実行: 入力=${aiInputText.length}文字, title=${title}`);
       const aiResult: AiSummaryResult = await summarizeWithOpenCodeGo(aiInputText, title, aiSettings);
@@ -131,11 +152,23 @@ Deno.serve(async (req) => {
       eventStartDate = aiResult.eventStartDate;
       eventEndDate = aiResult.eventEndDate;
       location = aiResult.location;
+      diagnostics.aiResultSummaryLength = aiResult.summary.length;
+      diagnostics.aiResultEventStartDate = aiResult.eventStartDate;
+      diagnostics.aiResultEventEndDate = aiResult.eventEndDate;
+      diagnostics.aiResultLocation = aiResult.location;
     } catch (err) {
       aiSummaryError = err instanceof Error ? err.message : '不明なエラー';
+      diagnostics.aiSummaryError = aiSummaryError;
+      diagnostics.aiResultSummaryLength = finalSummary.length;
       debug(`AI要約失敗: ${aiSummaryError}`);
     }
   } else {
+    let skipReason = '';
+    if (finalSummary) skipReason += '要約済み ';
+    if (!aiInputText) skipReason += 'AI入力テキストなし ';
+    if (!aiSettings.enabled) skipReason += 'AI無効 ';
+    if (!aiSettings.apiKey) skipReason += 'APIキー未設定 ';
+    diagnostics.aiSkippedReason = skipReason.trim() || 'unknown';
     debug(`AI 要約スキップ: finalSummary=${finalSummary.length}, aiInputText=${aiInputText.length}, aiEnabled=${aiSettings.enabled}, hasApiKey=${Boolean(aiSettings.apiKey)}`);
   }
 
@@ -184,7 +217,7 @@ Deno.serve(async (req) => {
   }
 
   debug(`クリップ登録成功: id=${inserted.id}`);
-  return new Response(JSON.stringify({ ok: true, clip: inserted, aiSummaryError }), {
+  return new Response(JSON.stringify({ ok: true, clip: inserted, aiSummaryError, diagnostics }), {
     status: 201,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });

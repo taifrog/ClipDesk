@@ -20,19 +20,25 @@ function extractBodyText(): string {
   }
 
   const text = clone.innerText || clone.textContent || '';
-  return text
+  const cleaned = text
     .replace(/\n{3,}/g, '\n\n')
     .replace(/[ \t]+/g, ' ')
     .trim();
+  // デバッグ: 本文抽出結果の長さを出力する
+  console.log(`[ClipDesk CS] extractBodyText: ${cleaned.length} 文字, title=${document.title || '(none)'}`);
+  return cleaned;
 }
 
 // ページ情報をまとめて取得する
 function getPageInfo(): PageInfo {
-  return {
+  const info: PageInfo = {
     url: location.href,
     title: document.title || '',
     body: extractBodyText(),
   };
+  // デバッグ: 返却するページ情報の概要を出力する
+  console.log(`[ClipDesk CS] getPageInfo: url=${info.url}, title=${info.title.slice(0, 50)}, body=${info.body.length} 文字`);
+  return info;
 }
 
 // ランタイムメッセージを受け取って、ページ情報を返す

@@ -100,7 +100,8 @@ async function getActivePageInfo(): Promise<PageInfo> {
 // @param payload 送信するクリップ情報
 // @param siteUrl 投稿先 URL
 // @param apiKey x-api-key ヘッダーに付与する API キー
-async function postToClipDesk(payload: ClipPayload, siteUrl: string, apiKey: string): Promise<void> {
+// @returns サーバーから返却された診断情報（diagnostics）など
+async function postToClipDesk(payload: ClipPayload, siteUrl: string, apiKey: string): Promise<Record<string, unknown>> {
   const response = await fetch(siteUrl, {
     method: 'POST',
     headers: {
@@ -110,10 +111,14 @@ async function postToClipDesk(payload: ClipPayload, siteUrl: string, apiKey: str
     body: JSON.stringify(payload),
   });
 
+  const responseData = await response.json().catch(() => ({})) as Record<string, unknown>;
+
   if (!response.ok) {
-    const text = await response.text().catch(() => '');
+    const text = responseData.error ? String(responseData.error) : await response.text().catch(() => '');
     throw new Error(getErrorMessage(response.status, text));
   }
+
+  return responseData;
 }
 
 // ステータスコードに応じたユーザー向けエラーメッセージを返す
@@ -151,7 +156,7 @@ function getErrorMessage(status: number, detail: string): string {
 async function createClip(
   categoryId?: string,
   comment?: string,
-): Promise<{ ok: true; payload: ClipPayload } | { ok: false; error: string }> {
+): Promise<{ ok: true; payload: ClipPayload; diagnostics?: Record<string, unknown> } | { ok: false; error: string }> {
   try {
     const settings = await getSettings();
     if (!settings.siteUrl) {
@@ -177,8 +182,15 @@ async function createClip(
     debug(`送信ペイロード: rawBody=${payload.rawBody ? payload.rawBody.length : 0}文字, title=${payload.title.slice(0, 50)}, categoryId=${payload.categoryId || 'others'}, comment=${payload.comment ? 'あり' : 'なし'}`);
 
     const endpoint = buildClipEndpoint(settings.supabaseUrl);
-    await postToClipDesk(payload, endpoint, settings.apiKey);
-    return { ok: true, payload };
+    const responseData = await postToClipDesk(payload, endpoint, settings.apiKey);
+    debug(`clip 応答: ok=${responseData.ok}, duplicate=${responseData.duplicate}, aiSummaryError=${responseData.aiSummaryError}`);
+    if (responseData.diagnostics) {
+      const diag = responseData.diagnostics as Record<string, unknown>;
+      debug(`診断情報: aiEnabled=${diag.aiEnabled}, hasApiKey=${diag.hasApiKey}, model=${diag.model}`);
+      debug(`入力長: rawBody=${diag.originalRawBodyLength}, text=${diag.originalTextLength}, aiInput=${diag.aiInputTextLength}, fetched=${diag.fetchedPageTextLength}`);
+      debug(`AI結果: attempted=${diag.aiAttempted}, skipped=${diag.aiSkippedReason}, summary=${diag.aiResultSummaryLength}, start=${diag.aiResultEventStartDate}, end=${diag.aiResultEventEndDate}, loc=${diag.aiResultLocation}, err=${diag.aiSummaryError}`);
+    }
+    return { ok: true, payload, diagnostics: responseData.diagnostics as Record<string, unknown> | undefined };
   } catch (err) {
     const message = err instanceof Error ? err.message : '不明なエラーが発生しました';
     debug(`クリップ作成失敗: ${message}`);

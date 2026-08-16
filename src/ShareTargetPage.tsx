@@ -63,6 +63,8 @@ export default function ShareTargetPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   // 登録結果メッセージ
   const [resultMessage, setResultMessage] = useState<string | null>(null)
+  // サーバーから返却された診断情報
+  const [diagnostics, setDiagnostics] = useState<Record<string, unknown> | null>(null)
 
   // 認証状態の初期化
   useEffect(() => {
@@ -251,6 +253,13 @@ export default function ShareTargetPage() {
           localStorage.setItem(API_KEY_STORAGE_KEY, effectiveApiKey)
         }
 
+        // 診断情報を保存する（要約/日付/場所の取得状況確認用）
+        if (data.diagnostics) {
+          setDiagnostics(data.diagnostics as Record<string, unknown>)
+        } else {
+          setDiagnostics(null)
+        }
+
         if (data.duplicate) {
           setResultMessage('この URL は既に登録されています')
         } else {
@@ -370,6 +379,46 @@ export default function ShareTargetPage() {
               <p className={`form-result ${resultMessage.includes('失敗') || resultMessage.includes('必要') ? 'error' : 'success'}`}>
                 {resultMessage}
               </p>
+            )}
+
+            {diagnostics && (
+              <details className="diagnostics-details">
+                <summary>診断情報</summary>
+                <dl className="diagnostics-list">
+                  <dt>AI有効</dt>
+                  <dd>{String(diagnostics.aiEnabled)}</dd>
+                  <dt>APIキー設定</dt>
+                  <dd>{String(diagnostics.hasApiKey)}</dd>
+                  <dt>モデル</dt>
+                  <dd>{String(diagnostics.model)}</dd>
+                  <dt>rawBody長</dt>
+                  <dd>{String(diagnostics.originalRawBodyLength)}</dd>
+                  <dt>text長</dt>
+                  <dd>{String(diagnostics.originalTextLength)}</dd>
+                  <dt>AI入力長</dt>
+                  <dd>{String(diagnostics.aiInputTextLength)}</dd>
+                  <dt>fetchPageText使用</dt>
+                  <dd>{String(diagnostics.fetchPageTextUsed)}</dd>
+                  <dt>fetchPageText成功</dt>
+                  <dd>{String(diagnostics.fetchPageTextSucceeded)}</dd>
+                  <dt>fetchedPageText長</dt>
+                  <dd>{String(diagnostics.fetchedPageTextLength)}</dd>
+                  <dt>AI試行</dt>
+                  <dd>{String(diagnostics.aiAttempted)}</dd>
+                  <dt>AIスキップ理由</dt>
+                  <dd>{String(diagnostics.aiSkippedReason || '—')}</dd>
+                  <dt>AIエラー</dt>
+                  <dd>{String(diagnostics.aiSummaryError || '—')}</dd>
+                  <dt>要約長</dt>
+                  <dd>{String(diagnostics.aiResultSummaryLength)}</dd>
+                  <dt>開始日</dt>
+                  <dd>{String(diagnostics.aiResultEventStartDate || '—')}</dd>
+                  <dt>終了日</dt>
+                  <dd>{String(diagnostics.aiResultEventEndDate || '—')}</dd>
+                  <dt>場所</dt>
+                  <dd>{String(diagnostics.aiResultLocation || '—')}</dd>
+                </dl>
+              </details>
             )}
 
             {!session && (
