@@ -171,6 +171,17 @@ Deno.serve(async (req) => {
   const collected: Record<string, unknown>[] = []
   const skipped = { duplicate: 0, insertError: 0 }
   const perSiteResults: Record<string, unknown>[] = []
+  // AI要約関連の診断情報
+  const aiDiagnostics = {
+    enabled: aiSettings.enabled,
+    hasApiKey: !!aiSettings.apiKey,
+    model: aiSettings.model,
+    attempted: 0,
+    succeeded: 0,
+    failed: 0,
+    skippedDueToEmptySummary: 0,
+    errors: [] as string[],
+  }
 
   for (const site of matchedSites) {
     if (collected.length >= count) break
@@ -194,6 +205,7 @@ Deno.serve(async (req) => {
     }
 
     let siteRegistered = 0
+    const articleDiagnostics: Record<string, unknown>[] = []
     for (const article of articles) {
       if (collected.length >= count) break
 
@@ -215,20 +227,38 @@ Deno.serve(async (req) => {
       let eventStartDate: string | null = null
       let eventEndDate: string | null = null
       let location: string | null = null
+      let aiError: string | null = null
 
       // AI要約が有効で API キーがあれば要約を生成する
       if (aiSettings.enabled && aiSettings.apiKey && summary) {
+        aiDiagnostics.attempted++
         try {
           const aiResult: AiSummaryResult = await summarizeWithOpenCodeGo(summary, article.title, aiSettings)
           if (aiResult.summary) summary = aiResult.summary
           eventStartDate = aiResult.eventStartDate
           eventEndDate = aiResult.eventEndDate
           location = aiResult.location
+          aiDiagnostics.succeeded++
         } catch (err) {
-          const message = err instanceof Error ? err.message : '不明なエラー'
-          debug(`AI要約失敗: ${article.url} - ${message}`)
+          aiError = err instanceof Error ? err.message : '不明なエラー'
+          aiDiagnostics.failed++
+          aiDiagnostics.errors.push(`${article.url}: ${aiError}`)
+          debug(`AI要約失敗: ${article.url} - ${aiError}`)
         }
+      } else if (aiSettings.enabled && aiSettings.apiKey && !summary) {
+        aiDiagnostics.skippedDueToEmptySummary++
       }
+
+      articleDiagnostics.push({
+        url: article.url,
+        title: article.title,
+        original_summary_length: article.summary?.length ?? 0,
+        ai_attempted: aiSettings.enabled && aiSettings.apiKey && !!summary,
+        ai_error: aiError,
+        event_start_date: eventStartDate,
+        event_end_date: eventEndDate,
+        location,
+      })
 
       const { data: inserted, error: insertError } = await supabase
         .from('clips')
@@ -266,6 +296,7 @@ Deno.serve(async (req) => {
       fetched: articles.length,
       registered: siteRegistered,
       error: fetchError,
+      articles: articleDiagnostics,
     })
   }
 
@@ -285,6 +316,7 @@ Deno.serve(async (req) => {
         per_site_results: perSiteResults,
         skipped,
         category_id: categoryId,
+        ai: aiDiagnostics,
       },
     }),
     {

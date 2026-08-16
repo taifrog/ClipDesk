@@ -17,12 +17,40 @@ interface CollectDialogProps {
 interface SiteDiagnostic {
   id?: number
   url?: string
+  site_url?: string
   tag?: string
   matched?: boolean
   rss_url?: string | null
   article_count?: number
+  fetched?: number
+  registered?: number
   sample_titles?: string[]
   error?: string
+  articles?: ArticleDiagnostic[]
+}
+
+// 記事単位の診断情報
+interface ArticleDiagnostic {
+  url: string
+  title: string
+  original_summary_length: number
+  ai_attempted: boolean
+  ai_error: string | null
+  event_start_date: string | null
+  event_end_date: string | null
+  location: string | null
+}
+
+// AI 要約関連の診断情報
+interface AiDiagnostics {
+  enabled?: boolean
+  hasApiKey?: boolean
+  model?: string
+  attempted?: number
+  succeeded?: number
+  failed?: number
+  skippedDueToEmptySummary?: number
+  errors?: string[]
 }
 
 // プリセットタグ一覧（設定にないタグも選択可能にするため）
@@ -80,9 +108,10 @@ export function CollectDialog({ isOpen, sourceSites, onClose, onCollect }: Colle
     const matchedSites = diagnostics.matched_sites as number | undefined
     const requestedCount = diagnostics.requested_count as number | undefined
     const categoryId = diagnostics.category_id as number | null | undefined
-    const skipped = diagnostics.skipped as number | undefined
+    const skipped = diagnostics.skipped as { duplicate?: number; insertError?: number } | undefined
+    const ai = diagnostics.ai as AiDiagnostics | undefined
     const siteList = (diagnostics.matched_site_list as SiteDiagnostic[] | undefined) || []
-    const perSiteResults = diagnostics.per_site_results as Record<string, SiteDiagnostic> | undefined
+    const perSiteResults = (diagnostics.per_site_results as SiteDiagnostic[] | undefined) || []
 
     return (
       <div className="collect-diagnostics">
@@ -90,17 +119,40 @@ export function CollectDialog({ isOpen, sourceSites, onClose, onCollect }: Colle
         <ul className="collect-diagnostics-summary">
           <li>マッチしたサイト数: {matchedSites ?? '不明'}</li>
           <li>要求件数: {requestedCount ?? '不明'}</li>
-          <li>スキップ件数: {skipped ?? 0}</li>
+          <li>重複スキップ: {skipped?.duplicate ?? 0}件 / 登録失敗: {skipped?.insertError ?? 0}件</li>
           <li>カテゴリID: {categoryId === null || categoryId === undefined ? '未指定' : categoryId}</li>
         </ul>
+        {ai && (
+          <div className="collect-diagnostics-ai">
+            <p className="collect-diagnostics-ai-title">AI要約診断:</p>
+            <ul>
+              <li>有効: {ai.enabled ? 'はい' : 'いいえ'}</li>
+              <li>APIキー設定: {ai.hasApiKey ? 'あり' : 'なし'}</li>
+              <li>モデル: {ai.model || '未設定'}</li>
+              <li>試行: {ai.attempted ?? 0}件 / 成功: {ai.succeeded ?? 0}件 / 失敗: {ai.failed ?? 0}件</li>
+              <li>要約空欄でスキップ: {ai.skippedDueToEmptySummary ?? 0}件</li>
+            </ul>
+            {ai.errors && ai.errors.length > 0 && (
+              <details className="collect-diagnostics-ai-errors">
+                <summary>AIエラー詳細（{ai.errors.length}件）</summary>
+                <ul>
+                  {ai.errors.map((err, idx) => (
+                    <li key={idx}>{err}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
         {siteList.length > 0 && (
           <div className="collect-diagnostics-sites">
             <p className="collect-diagnostics-sites-title">サイト別の確認結果:</p>
             <ul className="collect-diagnostics-site-list">
               {siteList.map((site) => {
-                const detail = perSiteResults?.[String(site.id)]
+                const detail = perSiteResults.find((r) => r.id === site.id)
+                const siteUrl = site.url || site.site_url
                 return (
-                  <li key={site.id ?? site.url} className="collect-diagnostics-site-item">
+                  <li key={site.id ?? siteUrl} className="collect-diagnostics-site-item">
                     <div className="collect-diagnostics-site-header">
                       <span className="collect-diagnostics-site-tag">{site.tag || '不明'}</span>
                       <span className={`collect-diagnostics-site-status ${site.matched ? 'ok' : 'ng'}`}>
@@ -108,16 +160,18 @@ export function CollectDialog({ isOpen, sourceSites, onClose, onCollect }: Colle
                       </span>
                     </div>
                     <a
-                      href={site.url}
+                      href={siteUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="collect-diagnostics-site-url"
                     >
-                      {site.url}
+                      {siteUrl}
                     </a>
                     <div className="collect-diagnostics-site-detail">
                       <span>RSS: {site.rss_url ? '設定済み' : '未設定'}</span>
-                      <span>記事数: {site.article_count ?? (detail?.article_count ?? '取得不可')}</span>
+                      <span>
+                        取得: {site.article_count ?? detail?.fetched ?? '取得不可'}件 / 登録: {detail?.registered ?? '取得不可'}件
+                      </span>
                     </div>
                     {site.error && (
                       <p className="collect-diagnostics-site-error">エラー: {site.error}</p>
@@ -128,6 +182,30 @@ export function CollectDialog({ isOpen, sourceSites, onClose, onCollect }: Colle
                         <ul>
                           {site.sample_titles.map((title, idx) => (
                             <li key={idx}>{title}</li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                    {detail?.articles && detail.articles.length > 0 && (
+                      <details className="collect-diagnostics-site-articles">
+                        <summary>記事別診断（{detail.articles.length}件）</summary>
+                        <ul>
+                          {detail.articles.map((article, idx) => (
+                            <li key={idx}>
+                              <a href={article.url} target="_blank" rel="noopener noreferrer">
+                                {article.title || article.url}
+                              </a>
+                              <span>（要約文字数: {article.original_summary_length}）</span>
+                              <span> / AI試行: {article.ai_attempted ? 'はい' : 'いいえ'}</span>
+                              {article.ai_error && <span> / エラー: {article.ai_error}</span>}
+                              {(article.event_start_date || article.event_end_date || article.location) && (
+                                <div>
+                                  {article.event_start_date && <span>開始: {article.event_start_date} </span>}
+                                  {article.event_end_date && <span>終了: {article.event_end_date} </span>}
+                                  {article.location && <span>場所: {article.location}</span>}
+                                </div>
+                              )}
+                            </li>
                           ))}
                         </ul>
                       </details>

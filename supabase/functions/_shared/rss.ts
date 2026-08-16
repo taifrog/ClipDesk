@@ -126,9 +126,31 @@ export async function detectRssUrl(siteUrl: string): Promise<string | null> {
 }
 
 // シンプルな XML タグ内のテキストを抽出する
+// 名前空間付きタグ（例: content:encoded）にも対応する
 function extractText(node: Node | null, tagName: string): string {
   if (!node) return '';
-  const el = (node as Element).querySelector ? (node as Element).querySelector(tagName) : null;
+  const parent = node as Element;
+  if (!parent.querySelector) return '';
+
+  // 名前空間付きタグの場合、querySelector(':scope > ns:tag') は動作しないことがあるため、
+  // タグ名のローカル名部分で子要素を走査する
+  const localName = tagName.includes(':') ? tagName.split(':')[1] : tagName;
+  const nsPrefix = tagName.includes(':') ? tagName.split(':')[0] : null;
+
+  const children = parent.children;
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+    const childLocal = child.localName || child.tagName;
+    const childPrefix = child.prefix || '';
+    if (childLocal.toLowerCase() === localName.toLowerCase()) {
+      if (!nsPrefix || childPrefix.toLowerCase() === nsPrefix.toLowerCase()) {
+        return (child.textContent || '').trim();
+      }
+    }
+  }
+
+  // フォールバック: querySelector で取得を試みる
+  const el = parent.querySelector(tagName);
   if (!el) return '';
   return (el.textContent || '').trim();
 }
