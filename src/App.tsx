@@ -27,6 +27,7 @@ import { CollectDialog } from './components/CollectDialog'
 import { Header } from './components/Header'
 import { SettingsDialog } from './components/SettingsDialog'
 import { Sidebar } from './components/Sidebar'
+import { CalendarView } from './components/CalendarView'
 import { AuthPanel } from './components/AuthPanel'
 import ShareTargetPage from './ShareTargetPage'
 import { getSupabaseClient } from './lib/supabase'
@@ -422,6 +423,7 @@ function App() {
   const selectedCategoryName = useMemo(() => {
     if (selectedCategoryId === 'trash') return 'ゴミ箱'
     if (selectedCategoryId === 'today') return '新規クリップ'
+    if (selectedCategoryId === 'calendar') return 'カレンダー'
     const found = categories.find((cat) => cat.id === selectedCategoryId)
     return found?.name ?? '未分類'
   }, [categories, selectedCategoryId])
@@ -447,6 +449,7 @@ function App() {
   // 並び替えモードに応じてソートする（ゴミ箱は常に削除日時降順）
   const displayClips = useMemo(() => {
     if (selectedCategoryId === 'trash') return trashClips
+    if (selectedCategoryId === 'calendar') return []
 
     let filtered = clips
     if (selectedCategoryId !== 'today') {
@@ -1077,7 +1080,9 @@ function App() {
         />
 
         <div className="clip-content">
-          {isLoading && clips.length === 0 ? (
+          {selectedCategoryId === 'calendar' ? (
+            <CalendarView clips={clips} />
+          ) : isLoading && clips.length === 0 ? (
             <p className="empty-message">読み込み中…</p>
           ) : displayClips.length === 0 ? (
             <p className="empty-message">

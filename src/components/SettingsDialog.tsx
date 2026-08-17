@@ -25,6 +25,9 @@ interface SettingsDialogProps {
   onClearNewlyCreatedKey: () => void
 }
 
+// 収集元サイト追加機能を一時的に非表示にするフラグ
+const HIDE_COLLECT_FEATURES = true
+
 // AI要約のデフォルト設定値
 const DEFAULT_AI_SUMMARY_SETTINGS: AiSummarySettings = {
   enabled: true,
@@ -455,37 +458,39 @@ export function SettingsDialog({
 
         <hr className="settings-divider" />
 
-        {/* 収集元サイト追加フォーム */}
-        <section className="settings-section">
-          <h3 className="settings-section-title">収集元サイトを追加</h3>
-          <form onSubmit={handleSubmit} className="settings-form">
-            <div className="form-group">
-              <label htmlFor="settings-tag">タグ</label>
-              <input
-                id="settings-tag"
-                type="text"
-                value={tag}
-                onChange={(e) => setTag(e.target.value)}
-                placeholder="例：AI"
-                disabled={isSubmitting}
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="settings-url">サイトURL</label>
-              <input
-                id="settings-url"
-                type="url"
-                value={siteUrl}
-                onChange={(e) => setSiteUrl(e.target.value)}
-                placeholder="https://ledge.ai/"
-                disabled={isSubmitting}
-              />
-            </div>
-            <button type="submit" className="button-primary" disabled={isSubmitting}>
-              {isSubmitting ? '追加中…' : '追加'}
-            </button>
-          </form>
-        </section>
+        {/* 収集元サイト追加フォーム（一時的に非表示） */}
+        {!HIDE_COLLECT_FEATURES && (
+          <section className="settings-section">
+            <h3 className="settings-section-title">収集元サイトを追加</h3>
+            <form onSubmit={handleSubmit} className="settings-form">
+              <div className="form-group">
+                <label htmlFor="settings-tag">タグ</label>
+                <input
+                  id="settings-tag"
+                  type="text"
+                  value={tag}
+                  onChange={(e) => setTag(e.target.value)}
+                  placeholder="例：AI"
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="settings-url">サイトURL</label>
+                <input
+                  id="settings-url"
+                  type="url"
+                  value={siteUrl}
+                  onChange={(e) => setSiteUrl(e.target.value)}
+                  placeholder="https://ledge.ai/"
+                  disabled={isSubmitting}
+                />
+              </div>
+              <button type="submit" className="button-primary" disabled={isSubmitting}>
+                {isSubmitting ? '追加中…' : '追加'}
+              </button>
+            </form>
+          </section>
+        )}
 
         {/* 登録済みサイト一覧 */}
         <section className="settings-section">

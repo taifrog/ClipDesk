@@ -124,7 +124,10 @@ export function Sidebar({
   // 未分類カテゴリを取得する（存在しなければデフォルト値を使用）
   const othersCategory = categories.find((c) => c.id === 'others') ?? { id: 'others', name: '未分類', icon: 'grid' }
   // ユーザー定義カテゴリ（all / others / trash / today は除く）
-  const userCategories = categories.filter((c) => !['all', 'others', 'trash', 'today'].includes(c.id))
+  const userCategories = categories.filter((c) => !['all', 'others', 'trash', 'today', 'calendar'].includes(c.id))
+
+  // カレンダー対象のクリップ件数（eventStartDate または eventEndDate が登録されているクリップ）
+  const calendarCount = clips.filter((clip) => clip.eventStartDate || clip.eventEndDate).length
 
   // 表示中のコンテキストメニュー情報
   const [contextMenu, setContextMenu] = useState<{
@@ -246,6 +249,20 @@ export function Sidebar({
             </button>
           </li>
         </ul>
+          {/* カレンダー */}
+          <li>
+            <button
+              type="button"
+              className={`category-item ${selectedCategoryId === 'calendar' ? 'active' : ''}`}
+              onClick={() => onSelectCategory('calendar')}
+            >
+              <span className="category-icon">
+                <Icon name="calendar" />
+              </span>
+              <span className="category-name">カレンダー</span>
+              <span className="category-count">{calendarCount}</span>
+            </button>
+          </li>
 
         {/* カテゴリ一覧 */}
         <div className="sidebar-section-label">カテゴリ</div>
