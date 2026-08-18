@@ -65,6 +65,8 @@ export default function ShareTargetPage() {
   const [resultMessage, setResultMessage] = useState<string | null>(null)
   // サーバーから返却された診断情報
   const [diagnostics, setDiagnostics] = useState<Record<string, unknown> | null>(null)
+  // 登録したクリップの AI 要約状態
+  const [registeredClipStatus, setRegisteredClipStatus] = useState<'pending' | 'processing' | 'completed' | 'failed' | null>(null)
 
   // 認証状態の初期化
   useEffect(() => {
@@ -262,8 +264,11 @@ export default function ShareTargetPage() {
 
         if (data.duplicate) {
           setResultMessage('この URL は既に登録されています')
+          setRegisteredClipStatus(null)
         } else {
           setResultMessage('クリップを登録しました')
+          const status = (data.clip?.ai_enrichment_status as 'pending' | 'processing' | 'completed' | 'failed') || null
+          setRegisteredClipStatus(status)
         }
 
         // 登録成功後、共有元画面に戻る
@@ -392,6 +397,10 @@ export default function ShareTargetPage() {
               <p className={`form-result ${resultMessage.includes('失敗') || resultMessage.includes('必要') ? 'error' : 'success'}`}>
                 {resultMessage}
               </p>
+            )}
+
+            {registeredClipStatus && (registeredClipStatus === 'pending' || registeredClipStatus === 'processing') && (
+              <p className="form-result success">要約を生成中です。しばらくするとクリップ一覧に反映されます。</p>
             )}
 
             {diagnostics && (

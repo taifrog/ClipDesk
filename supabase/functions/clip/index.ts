@@ -1,11 +1,9 @@
 // Chrome 拡張機能などからクリップを受信する Edge Function
 // 認証は x-api-key ヘッダーによる API キー認証を行う。
+// AI 要約・日時・場所抽出は即時には行わず、登録後に enrich-clip を非同期で呼び出す。
 
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { getServiceClient, getApiKey, getJwt, resolveUserIdByApiKey, resolveUserIdByJwt } from '../_shared/supabase.ts';
-import { summarizeWithOpenCodeGo, type AiSummaryResult } from '../_shared/ai.ts';
-import { getAppSettings } from '../_shared/settings.ts';
-import { fetchPageText } from '../_shared/fetchPage.ts';
 
 interface ClipPayload {
   url?: string;
@@ -22,6 +20,42 @@ interface ClipPayload {
 function debug(msg: string) {
   // 開発時は有効、本番はここをコメントアウト
   console.log(`[DEBUG] ${msg}`);
+}
+
+// enrich-clip Edge Function を非同期で呼び出す
+// fire-and-forget: レスポンスを待たずに処理を続行する
+// @param req 元のリクエスト（認証ヘッダー取得用）
+// @param clipId 登録したクリップの ID
+// @param payload enrich-clip へ渡すペイロード
+async function enqueueEnrichClip(req: Request, clipId: number, payload: Omit<ClipPayload, 'summary' | 'categoryId' | 'comment'> & { clipId: number }) {
+  try {
+    const url = new URL(req.url);
+    const enrichUrl = `${url.protocol}//${url.host}/functions/v1/enrich-clip`;
+
+    // 元のリクエストと同じ認証ヘッダーを引き継ぐ
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    const apiKey = getApiKey(req);
+    if (apiKey) {
+      headers['x-api-key'] = apiKey;
+    }
+    const jwt = getJwt(req);
+    if (jwt) {
+      headers['Authorization'] = `Bearer ${jwt}`;
+    }
+
+    debug(`enrich-clip 非同期呼び出し: ${enrichUrl}, clipId=${clipId}`);
+    fetch(enrichUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    }).catch((err) => {
+      debug(`enrich-clip fire-and-forget 失敗: ${err instanceof Error ? err.message : '不明なエラー'}`);
+    });
+  } catch (err) {
+    debug(`enrich-clip キューイング失敗: ${err instanceof Error ? err.message : '不明なエラー'}`);
+  }
 }
 
 Deno.serve(async (req) => {
@@ -80,97 +114,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  // AI 要約処理
-  let finalSummary = summary || '';
-  let finalRawBody = rawBody || '';
-  let aiSummaryError: string | null = null;
-  const aiSettings = await getAppSettings(supabase, userId);
-
-  debug(`クリップ受信: ${url}, summary=${finalSummary.length}, rawBody=${finalRawBody.length}, aiEnabled=${aiSettings.enabled}`);
-
-  // AI 要約用の入力テキストを構築する
-  // 優先順位: rawBody > 共有テキスト（URL除去） > URL から取得した HTML > title のみ
-  let aiInputText = finalRawBody;
-
-  // rawBody が空の場合、共有テキストのうち URL 以外の部分をフォールバックとして使用する
-  if (!aiInputText && text) {
-    const textWithoutUrl = text.replace(/https?:\/\/[^\s]+/g, ' ').trim();
-    if (textWithoutUrl) {
-      aiInputText = textWithoutUrl;
-      debug(`共有テキストを AI 入力フォールバックとして使用: ${aiInputText.length}文字`);
-    }
-  }
-
-  // AI 入力テキストが不足している場合（500文字未満）、URL から HTML を取得して補完する
-  // スマホ共有では text にタイトルと URL しか含まれないことが多いため
-  const MIN_AI_INPUT_LENGTH = 500;
-  if (aiInputText.length < MIN_AI_INPUT_LENGTH && url && aiSettings.enabled && aiSettings.apiKey) {
-    debug(`AI 入力テキストが不足（${aiInputText.length}文字）: URL から HTML を取得します: ${url}`);
-    const fetchedText = await fetchPageText(url);
-    if (fetchedText) {
-      aiInputText = fetchedText;
-      finalRawBody = fetchedText;
-      debug(`HTML 取得成功: ${finalRawBody.length}文字`);
-    } else {
-      debug('HTML 取得失敗: 既存のテキストで AI 要約を試行します');
-    }
-  }
-
-  // イベント情報の抽出結果を保持する変数
-  let eventStartDate: string | null = null;
-  let eventEndDate: string | null = null;
-  let location: string | null = null;
-
-  // 診断情報を保持する（レスポンスに含めてフロントエンドでの確認を容易にする）
-  const diagnostics = {
-    aiEnabled: aiSettings.enabled,
-    hasApiKey: Boolean(aiSettings.apiKey),
-    model: aiSettings.model,
-    originalRawBodyLength: (rawBody || '').length,
-    originalTextLength: (text || '').length,
-    aiInputTextLength: aiInputText.length,
-    fetchedPageTextLength: finalRawBody.length,
-    fetchPageTextUsed: aiInputText.length < MIN_AI_INPUT_LENGTH && url && aiSettings.enabled && aiSettings.apiKey,
-    fetchPageTextSucceeded: finalRawBody.length > 0 && finalRawBody !== (rawBody || '') && finalRawBody !== (text || ''),
-    aiAttempted: false,
-    aiSkippedReason: null as string | null,
-    aiSummaryError: null as string | null,
-    aiResultSummaryLength: 0,
-    aiResultEventStartDate: null as string | null,
-    aiResultEventEndDate: null as string | null,
-    aiResultLocation: null as string | null,
-  };
-
-  // 要約が未設定で、AI 入力テキストが存在し、AI 設定が有効な場合に要約・イベント情報を抽出する
-  if (!finalSummary && aiInputText && aiSettings.enabled && aiSettings.apiKey) {
-    diagnostics.aiAttempted = true;
-    try {
-      debug(`AI 要約実行: 入力=${aiInputText.length}文字, title=${title}`);
-      const aiResult: AiSummaryResult = await summarizeWithOpenCodeGo(aiInputText, title, aiSettings);
-      debug(`AI 要約結果: summary=${aiResult.summary.length}文字, eventStartDate=${aiResult.eventStartDate}, eventEndDate=${aiResult.eventEndDate}, location=${aiResult.location}`);
-      if (aiResult.summary) finalSummary = aiResult.summary;
-      eventStartDate = aiResult.eventStartDate;
-      eventEndDate = aiResult.eventEndDate;
-      location = aiResult.location;
-      diagnostics.aiResultSummaryLength = aiResult.summary.length;
-      diagnostics.aiResultEventStartDate = aiResult.eventStartDate;
-      diagnostics.aiResultEventEndDate = aiResult.eventEndDate;
-      diagnostics.aiResultLocation = aiResult.location;
-    } catch (err) {
-      aiSummaryError = err instanceof Error ? err.message : '不明なエラー';
-      diagnostics.aiSummaryError = aiSummaryError;
-      diagnostics.aiResultSummaryLength = finalSummary.length;
-      debug(`AI要約失敗: ${aiSummaryError}`);
-    }
-  } else {
-    let skipReason = '';
-    if (finalSummary) skipReason += '要約済み ';
-    if (!aiInputText) skipReason += 'AI入力テキストなし ';
-    if (!aiSettings.enabled) skipReason += 'AI無効 ';
-    if (!aiSettings.apiKey) skipReason += 'APIキー未設定 ';
-    diagnostics.aiSkippedReason = skipReason.trim() || 'unknown';
-    debug(`AI 要約スキップ: finalSummary=${finalSummary.length}, aiInputText=${aiInputText.length}, aiEnabled=${aiSettings.enabled}, hasApiKey=${Boolean(aiSettings.apiKey)}`);
-  }
+  debug(`クリップ受信: ${url}, summary=${(summary || '').length}, rawBody=${(rawBody || '').length}, text=${(text || '').length}`);
 
   // 重複チェック（同一ユーザー内で未削除の同じURL）
   const { data: existing } = await supabase
@@ -188,22 +132,20 @@ Deno.serve(async (req) => {
     });
   }
 
-  // クリップ登録
+  // クリップ登録（AI 要約は未済の状態。要約が渡されていればそのまま保存する）
   const { data: inserted, error } = await supabase
     .from('clips')
     .insert({
       user_id: userId,
       url,
       title,
-      summary: finalSummary,
-      raw_body: finalRawBody,
+      summary: summary || '',
+      raw_body: rawBody || '',
       category_id: categoryId || 'others',
       is_pinned: false,
       is_checked: false,
       comment: comment || '',
-      event_start_date: eventStartDate,
-      event_end_date: eventEndDate,
-      location,
+      ai_enrichment_status: 'pending',
     })
     .select()
     .single();
@@ -216,8 +158,19 @@ Deno.serve(async (req) => {
     });
   }
 
+  // 要約が未設定の場合のみ、非同期で AI 要約を実行する
+  if (!summary) {
+    enqueueEnrichClip(req, inserted.id, {
+      clipId: inserted.id,
+      url,
+      title,
+      rawBody: rawBody || '',
+      text: text || '',
+    });
+  }
+
   debug(`クリップ登録成功: id=${inserted.id}`);
-  return new Response(JSON.stringify({ ok: true, clip: inserted, aiSummaryError, diagnostics }), {
+  return new Response(JSON.stringify({ ok: true, clip: inserted }), {
     status: 201,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });

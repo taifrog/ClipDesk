@@ -70,6 +70,7 @@ function normalizeApiClip(raw: Record<string, unknown>): Clip {
     eventStartDate: raw.event_start_date ? String(raw.event_start_date) : null,
     eventEndDate: raw.event_end_date ? String(raw.event_end_date) : null,
     location: raw.location ? String(raw.location) : null,
+    aiEnrichmentStatus: (raw.ai_enrichment_status as 'pending' | 'processing' | 'completed' | 'failed') || null,
   }
 }
 

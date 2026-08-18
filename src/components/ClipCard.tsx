@@ -174,6 +174,9 @@ export function ClipCard({
   // イベント情報があるかどうか
   const hasEventInfo = Boolean(clip.eventStartDate || clip.eventEndDate || clip.location)
 
+  // AI 要約処理中かどうか
+  const isEnriching = clip.aiEnrichmentStatus === 'pending' || clip.aiEnrichmentStatus === 'processing'
+
   return (
     <article
       className={`clip-card ${viewMode === 'list' ? 'clip-card-list' : ''}`}
@@ -284,6 +287,14 @@ export function ClipCard({
           <span>{clip.comment}</span>
         </button>
       ) : null}
+
+      {/* AI 要約生成中インジケーター */}
+      {isEnriching && (
+        <div className="clip-card-enriching">
+          <span className="enriching-spinner" aria-hidden="true" />
+          <span>要約生成中</span>
+        </div>
+      )}
 
       {/* カードフッター */}
       <div className={`clip-card-footer ${viewMode === 'list' ? 'clip-card-footer-list' : ''}`}>

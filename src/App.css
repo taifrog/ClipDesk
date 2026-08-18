@@ -879,6 +879,35 @@
   border-color: var(--accent);
 }
 
+/* AI 要約生成中インジケーター */
+.clip-card-enriching {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.enriching-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--accent-border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: enriching-spin 0.8s linear infinite;
+}
+
+@keyframes enriching-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* クリップカード内のカテゴリ選択（スマホ用） */
 .clip-card-category-select {
   padding: 2px 8px;

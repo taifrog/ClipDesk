@@ -24,6 +24,9 @@ export interface Clip {
   eventEndDate?: string | null
   // イベント・展示などの開催場所（null の場合は場所不明またはイベント情報なし）
   location?: string | null
+  // AI 要約・日時・場所抽出の処理状態
+  // pending: 要約待ち, processing: 処理中, completed: 完了, failed: 失敗
+  aiEnrichmentStatus?: 'pending' | 'processing' | 'completed' | 'failed' | null
 }
 
 // カテゴリ1件を表す型
