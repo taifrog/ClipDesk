@@ -90,6 +90,11 @@ export function ClipGrid({
         ))}
       </div>
 
+      {/* ゴミ箱表示時は自動削除の注釈を表示する */}
+      {isTrash && (
+        <p className="trash-notice">ゴミ箱に入れてから1週間経過したクリップは自動的に削除されます。</p>
+      )}
+
       {/* ページネーション */}
       {hasPagination && (
         <div className="clip-grid-pagination">
