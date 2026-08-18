@@ -28,7 +28,16 @@ END;
 $$;
 
 -- 既存の同名ジョブがあれば削除してから再作成する（冪等性を保つ）
-SELECT cron.unschedule('cleanup-expired-trash-clips');
+-- ジョブが存在しない場合、unschedule はエラーを返すため DO ブロックで例外を無視する
+DO $$
+BEGIN
+  PERFORM cron.unschedule('cleanup-expired-trash-clips');
+EXCEPTION
+  WHEN OTHERS THEN
+    -- ジョブが存在しない場合は無視する
+    NULL;
+END
+$$;
 
 -- 毎日 0 時（JST: Asia/Tokyo）に cleanup_expired_trash_clips() を実行する
 SELECT cron.schedule(
