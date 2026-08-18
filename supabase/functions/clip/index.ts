@@ -23,14 +23,17 @@ function debug(msg: string) {
 }
 
 // enrich-clip Edge Function を非同期で呼び出す
-// fire-and-forget: レスポンスを待たずに処理を続行する
+// clip 関数のレスポンス返却前に、enrich-clip への HTTP リクエスト発信が完了することを保証する。
+// enrich-clip 側の AI 処理自体は待たず（fire-and-forget）、即座に clip 側のレスポンスを返す。
 // @param req 元のリクエスト（認証ヘッダー取得用）
 // @param clipId 登録したクリップの ID
 // @param payload enrich-clip へ渡すペイロード
 async function enqueueEnrichClip(req: Request, clipId: number, payload: Omit<ClipPayload, 'summary' | 'categoryId' | 'comment'> & { clipId: number }) {
   try {
     const url = new URL(req.url);
-    const enrichUrl = `${url.protocol}//${url.host}/functions/v1/enrich-clip`;
+    // Supabase Edge Functions は HTTPS でアクセスする必要がある。
+    // Edge Functions 内部では req.url のプロトコルが http になっている場合があるため、https に強制する。
+    const enrichUrl = `https://${url.host}/functions/v1/enrich-clip`;
 
     // 元のリクエストと同じ認証ヘッダーを引き継ぐ
     const headers: Record<string, string> = {
@@ -46,7 +49,7 @@ async function enqueueEnrichClip(req: Request, clipId: number, payload: Omit<Cli
     }
 
     debug(`enrich-clip 非同期呼び出し: ${enrichUrl}, clipId=${clipId}`);
-    fetch(enrichUrl, {
+    return fetch(enrichUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
@@ -159,8 +162,9 @@ Deno.serve(async (req) => {
   }
 
   // 要約が未設定の場合のみ、非同期で AI 要約を実行する
+  // await して HTTP リクエスト発信を保証するが、enrich-clip 側の処理完了は待たない
   if (!summary) {
-    enqueueEnrichClip(req, inserted.id, {
+    await enqueueEnrichClip(req, inserted.id, {
       clipId: inserted.id,
       url,
       title,
