@@ -27,6 +27,10 @@ export interface Clip {
   // AI 要約・日時・場所抽出の処理状態
   // pending: 要約待ち, processing: 処理中, completed: 完了, failed: 失敗
   aiEnrichmentStatus?: 'pending' | 'processing' | 'completed' | 'failed' | null
+  // Obsidian への書き出し予定フラグ（true の場合はあとで Obsidian に書き出す）
+  obsidianPending?: boolean
+  // Obsidian へ実際に書き出された日時（null の場合は未書き出し）
+  obsidianExportedAt?: string | null
 }
 
 // カテゴリ1件を表す型
@@ -64,6 +68,19 @@ export interface AiSummarySettings {
   model: string
   // 要約する言語
   language: string
+}
+
+// Obsidian 連携設定を表す型
+// PC 版 ClipDesk ローカルサーバー経由で Obsidian Local REST API へ書き出す設定
+export interface ObsidianSettings {
+  // Obsidian Local REST API の認証用 API キー
+  apiKey: string
+  // Obsidian ノートを保存するフォルダパス
+  folder: string
+  // Obsidian ノートのファイル名テンプレート
+  filenameTemplate: string
+  // Obsidian ノートの本文テンプレート
+  noteTemplate: string
 }
 
 // Chrome 拡張機能等で使用する API キー1件を表す型

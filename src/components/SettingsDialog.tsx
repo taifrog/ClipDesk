@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
-import type { AiSummarySettings, SourceSite, UserApiKey } from '../types'
+import type { AiSummarySettings, ObsidianSettings, SourceSite, UserApiKey } from '../types'
 
 // 設定ダイアログのプロパティ
 interface SettingsDialogProps {
   isOpen: boolean
   sourceSites: SourceSite[]
   aiSummarySettings: AiSummarySettings
+  obsidianSettings: ObsidianSettings
   apiKeys: UserApiKey[]
   isLoadingApiKeys: boolean
   apiKeyError: string | null
@@ -17,6 +18,7 @@ interface SettingsDialogProps {
   onUpdateSourceSiteRssUrl: (id: number, rssUrl: string | null) => Promise<void>
   onDeleteSourceSite: (id: number) => Promise<void>
   onSaveAiSummarySettings: (settings: AiSummarySettings) => Promise<void>
+  onSaveObsidianSettings: (settings: ObsidianSettings) => Promise<void>
   onFetchApiKeys: () => Promise<void>
   onCreateApiKey: (label: string) => Promise<void>
   onDeleteApiKey: (id: number) => Promise<void>
@@ -36,12 +38,43 @@ const DEFAULT_AI_SUMMARY_SETTINGS: AiSummarySettings = {
   language: 'ja',
 }
 
+// Obsidian 連携のデフォルト設定値
+const DEFAULT_OBSIDIAN_SETTINGS: ObsidianSettings = {
+  apiKey: '',
+  folder: 'ClipDesk',
+  filenameTemplate: '{{title}}',
+  noteTemplate: `---
+registered_at: {{registeredAt}}
+url: {{url}}
+title: {{title}}
+event_start_date: {{eventStartDate}}
+event_end_date: {{eventEndDate}}
+location: {{location}}
+category: {{category}}
+comment: {{comment}}
+---
+
+# {{title}}
+
+URL: {{url}}
+
+## 要約
+
+{{summary}}
+
+## コメント
+
+{{comment}}
+`,
+}
+
 // 設定ダイアログ
-// クリップ収集元サイト（タグ・サイトURL）の登録・削除と、AI要約設定、API キー管理を行う
+// クリップ収集元サイト（タグ・サイトURL）の登録・削除と、AI要約設定、Obsidian 連携設定、API キー管理を行う
 export function SettingsDialog({
   isOpen,
   sourceSites,
   aiSummarySettings,
+  obsidianSettings,
   apiKeys,
   isLoadingApiKeys,
   apiKeyError,
@@ -51,6 +84,7 @@ export function SettingsDialog({
   onUpdateSourceSiteRssUrl,
   onDeleteSourceSite,
   onSaveAiSummarySettings,
+  onSaveObsidianSettings,
   onFetchApiKeys,
   onCreateApiKey,
   onDeleteApiKey,
@@ -82,6 +116,13 @@ export function SettingsDialog({
   const [isSavingAiSettings, setIsSavingAiSettings] = useState<boolean>(false)
   // AI要約設定保存完了メッセージ
   const [aiSettingsSavedMessage, setAiSettingsSavedMessage] = useState<string | null>(null)
+
+  // Obsidian 連携設定のローカル編集用状態
+  const [localObsidianSettings, setLocalObsidianSettings] = useState<ObsidianSettings>(DEFAULT_OBSIDIAN_SETTINGS)
+  // Obsidian 連携設定保存中フラグ
+  const [isSavingObsidianSettings, setIsSavingObsidianSettings] = useState<boolean>(false)
+  // Obsidian 連携設定保存完了メッセージ
+  const [obsidianSettingsSavedMessage, setObsidianSettingsSavedMessage] = useState<string | null>(null)
 
   // API キー新規発行用のラベル
   const [apiKeyLabel, setApiKeyLabel] = useState<string>('')
@@ -121,10 +162,17 @@ export function SettingsDialog({
         model: aiSummarySettings.model || DEFAULT_AI_SUMMARY_SETTINGS.model,
         language: aiSummarySettings.language || DEFAULT_AI_SUMMARY_SETTINGS.language,
       })
+      setLocalObsidianSettings({
+        apiKey: obsidianSettings.apiKey ?? DEFAULT_OBSIDIAN_SETTINGS.apiKey,
+        folder: obsidianSettings.folder ?? DEFAULT_OBSIDIAN_SETTINGS.folder,
+        filenameTemplate: obsidianSettings.filenameTemplate ?? DEFAULT_OBSIDIAN_SETTINGS.filenameTemplate,
+        noteTemplate: obsidianSettings.noteTemplate ?? DEFAULT_OBSIDIAN_SETTINGS.noteTemplate,
+      })
+      setObsidianSettingsSavedMessage(null)
       // API キー一覧を取得する
       onFetchApiKeys().catch((err) => console.error('API キー一覧取得失敗:', err))
     }
-  }, [isOpen, aiSummarySettings, onFetchApiKeys])
+  }, [isOpen, aiSummarySettings, obsidianSettings, onFetchApiKeys])
 
   // ダイアログを閉じるときに新規発行キー表示をクリアする
   const handleClose = () => {
@@ -380,6 +428,34 @@ export function SettingsDialog({
     }
   }
 
+  // Obsidian 連携設定の入力値変更時の処理
+  const handleObsidianSettingsChange = (updates: Partial<ObsidianSettings>) => {
+    setLocalObsidianSettings((prev) => ({ ...prev, ...updates }))
+    // 入力が変わったら保存済みメッセージを消す
+    setObsidianSettingsSavedMessage(null)
+  }
+
+  // Obsidian 連携設定保存ボタン押下時の処理
+  const handleSaveObsidianSettings = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSavingObsidianSettings(true)
+    setError(null)
+    try {
+      await onSaveObsidianSettings({
+        apiKey: localObsidianSettings.apiKey.trim(),
+        folder: localObsidianSettings.folder.trim() || DEFAULT_OBSIDIAN_SETTINGS.folder,
+        filenameTemplate:
+          localObsidianSettings.filenameTemplate.trim() || DEFAULT_OBSIDIAN_SETTINGS.filenameTemplate,
+        noteTemplate: localObsidianSettings.noteTemplate,
+      })
+      setObsidianSettingsSavedMessage('Obsidian 連携設定を保存しました')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Obsidian 連携設定の保存に失敗しました')
+    } finally {
+      setIsSavingObsidianSettings(false)
+    }
+  }
+
   if (!isOpen) return null
 
   return (
@@ -452,6 +528,81 @@ export function SettingsDialog({
                 {isSavingAiSettings ? '保存中…' : 'AI要約設定を保存'}
               </button>
               {aiSettingsSavedMessage && <span className="save-success-message">{aiSettingsSavedMessage}</span>}
+            </div>
+          </form>
+        </section>
+
+        <hr className="settings-divider" />
+
+        {/* Obsidian 連携設定 */}
+        <section className="settings-section">
+          <h3 className="settings-section-title">Obsidian 連携設定</h3>
+          <p className="dialog-description">
+            PC ローカルサーバー経由で Obsidian Local REST API にノートを書き出すための設定です。
+            実際の書き出し処理は今後実装予定です。
+          </p>
+          <form onSubmit={handleSaveObsidianSettings} className="settings-form settings-form-vertical">
+            <div className="form-group">
+              <label htmlFor="obsidian-api-key">Obsidian Local REST API キー</label>
+              <input
+                id="obsidian-api-key"
+                type="password"
+                value={localObsidianSettings.apiKey}
+                onChange={(e) => handleObsidianSettingsChange({ apiKey: e.target.value })}
+                placeholder="API キーを入力"
+                disabled={isSavingObsidianSettings}
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="obsidian-folder">保存フォルダ</label>
+              <input
+                id="obsidian-folder"
+                type="text"
+                value={localObsidianSettings.folder}
+                onChange={(e) => handleObsidianSettingsChange({ folder: e.target.value })}
+                placeholder="ClipDesk"
+                disabled={isSavingObsidianSettings}
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="obsidian-filename-template">ファイル名テンプレート</label>
+              <input
+                id="obsidian-filename-template"
+                type="text"
+                value={localObsidianSettings.filenameTemplate}
+                onChange={(e) => handleObsidianSettingsChange({ filenameTemplate: e.target.value })}
+                placeholder="{{title}}"
+                disabled={isSavingObsidianSettings}
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="obsidian-note-template">ノートテンプレート</label>
+              <textarea
+                id="obsidian-note-template"
+                value={localObsidianSettings.noteTemplate}
+                onChange={(e) => handleObsidianSettingsChange({ noteTemplate: e.target.value })}
+                rows={12}
+                disabled={isSavingObsidianSettings}
+                className="obsidian-note-template-input"
+              />
+              <p className="dialog-description">
+                利用可能なプレースホルダ: {'{{'}registeredAt{'}}'}、{'{{'}url{'}}'}、
+                {'{{'}title{'}}'}、{'{{'}eventStartDate{'}}'}、{'{{'}eventEndDate{'}}'}、
+                {'{{'}location{'}}'}、{'{{'}category{'}}'}、{'{{'}comment{'}}'}、
+                {'{{'}summary{'}}'}
+              </p>
+            </div>
+
+            <div className="settings-form-actions">
+              <button type="submit" className="button-primary" disabled={isSavingObsidianSettings}>
+                {isSavingObsidianSettings ? '保存中…' : 'Obsidian 連携設定を保存'}
+              </button>
+              {obsidianSettingsSavedMessage && (
+                <span className="save-success-message">{obsidianSettingsSavedMessage}</span>
+              )}
             </div>
           </form>
         </section>

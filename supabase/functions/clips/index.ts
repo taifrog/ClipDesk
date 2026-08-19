@@ -12,6 +12,7 @@ interface ClipUpdateBody {
   event_start_date?: string | null;
   event_end_date?: string | null;
   location?: string | null;
+  obsidian_pending?: boolean;
 }
 
 Deno.serve(async (req) => {
@@ -130,6 +131,7 @@ Deno.serve(async (req) => {
       if ('event_start_date' in updates) allowed.event_start_date = updates.event_start_date;
       if ('event_end_date' in updates) allowed.event_end_date = updates.event_end_date;
       if ('location' in updates) allowed.location = updates.location;
+      if ('obsidian_pending' in updates) allowed.obsidian_pending = updates.obsidian_pending;
       if ('is_checked' in updates) {
         allowed.is_checked = updates.is_checked;
         allowed.checked_at = updates.is_checked ? new Date().toISOString() : null;

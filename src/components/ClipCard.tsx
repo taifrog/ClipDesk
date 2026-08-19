@@ -14,6 +14,7 @@ interface ClipCardProps {
   onToggleCheck: (id: number) => void
   onUpdateComment: (id: number, comment: string) => void
   onUpdateEventInfo?: (id: number, eventInfo: { eventStartDate?: string | null; eventEndDate?: string | null; location?: string | null }) => void
+  onToggleObsidianPending?: (id: number) => void
   onRestore?: (id: number) => void
   onChangeCategory?: (id: number, categoryId: string) => void
 }
@@ -67,6 +68,24 @@ function CommentIcon() {
   )
 }
 
+// Obsidian アイコンを表示するコンポーネント
+// active: true の時は書き出し予定（塗りつぶし）、false の時は予定なし（枠線）を表示する
+function ObsidianIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      className={`obsidian-icon ${active ? 'active' : ''}`}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      {active ? (
+        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l4.59-4.58L18 11l-6 6z" />
+      ) : (
+        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z" />
+      )}
+    </svg>
+  )
+}
+
 // チェックマークアイコンを表示するコンポーネント
 // active: true の時はチェック済みマーク、false の時は空の四角を表示する
 function CheckIcon({ active }: { active: boolean }) {
@@ -98,6 +117,7 @@ export function ClipCard({
   onToggleCheck,
   onUpdateComment,
   onUpdateEventInfo,
+  onToggleObsidianPending,
   onRestore,
   onChangeCategory,
 }: ClipCardProps) {
@@ -139,6 +159,11 @@ export function ClipCard({
   // チェックマーク切り替えボタンクリック時
   const handleCheckClick = () => {
     onToggleCheck(clip.id)
+  }
+
+  // Obsidian 書き出し予定フラグ切り替えボタンクリック時
+  const handleObsidianPendingClick = () => {
+    onToggleObsidianPending?.(clip.id)
   }
 
   // コメント編集を確定する
@@ -357,6 +382,14 @@ export function ClipCard({
               onClick={handlePinClick}
             >
               <StarIcon active={clip.isPinned} />
+            </button>
+            <button
+              type="button"
+              className={`clip-card-obsidian ${clip.obsidianPending ? 'active' : ''}`}
+              aria-label={clip.obsidianPending ? 'Obsidian 書き出し予定を解除' : 'Obsidian 書き出し予定にする'}
+              onClick={handleObsidianPendingClick}
+            >
+              <ObsidianIcon active={clip.obsidianPending ?? false} />
             </button>
           </div>
         )}

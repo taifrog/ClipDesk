@@ -15,6 +15,15 @@ export interface AiSummaryResult {
   location: string | null;
 }
 
+// Obsidian 連携設定を表す型
+// PC 版 ClipDesk ローカルサーバー経由で Obsidian Local REST API へ書き出す設定
+export interface ObsidianSettings {
+  apiKey: string;
+  folder: string;
+  filenameTemplate: string;
+  noteTemplate: string;
+}
+
 // テキストを指定文字数に制限する
 function truncateText(text: string, maxChars: number): string {
   if (!text) return '';

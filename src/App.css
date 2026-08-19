@@ -721,6 +721,64 @@
   background: var(--accent-bg);
 }
 
+/* クリップカードの Obsidian 書き出し予定ボタン */
+.clip-card-obsidian {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.clip-card-obsidian:hover {
+  background: var(--accent-bg);
+}
+
+.obsidian-icon {
+  width: 18px;
+  height: 18px;
+  fill: transparent;
+  stroke: var(--text);
+  stroke-width: 1.5;
+  transition: fill 0.2s, stroke 0.2s;
+  opacity: 0.6;
+}
+
+.obsidian-icon.active {
+  fill: var(--accent);
+  stroke: var(--accent);
+  opacity: 1;
+}
+
+/* Obsidian 連携設定のノートテンプレート入力欄 */
+.obsidian-note-template-input {
+  width: 100%;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-h);
+  font-size: 13px;
+  line-height: 1.5;
+  outline: none;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.obsidian-note-template-input:focus {
+  border-color: var(--accent);
+}
+
+.clip-card-list .clip-card-obsidian {
+  align-self: center;
+}
+
 .check-icon {
   width: 18px;
   height: 18px;

@@ -31,7 +31,7 @@ import { CalendarView } from './components/CalendarView'
 import { AuthPanel } from './components/AuthPanel'
 import ShareTargetPage from './ShareTargetPage'
 import { getSupabaseClient } from './lib/supabase'
-import type { AiSummarySettings, Category, Clip, SortMode, SourceSite, UserApiKey, ViewMode } from './types'
+import type { AiSummarySettings, Category, Clip, ObsidianSettings, SortMode, SourceSite, UserApiKey, ViewMode } from './types'
 import './App.css'
 
 // AI要約設定のデフォルト値
@@ -40,6 +40,36 @@ const DEFAULT_AI_SUMMARY_SETTINGS: AiSummarySettings = {
   apiKey: '',
   model: 'gpt-4o-mini',
   language: 'ja',
+}
+
+// Obsidian 連携設定のデフォルト値
+const DEFAULT_OBSIDIAN_SETTINGS: ObsidianSettings = {
+  apiKey: '',
+  folder: 'ClipDesk',
+  filenameTemplate: '{{title}}',
+  noteTemplate: `---
+registered_at: {{registeredAt}}
+url: {{url}}
+title: {{title}}
+event_start_date: {{eventStartDate}}
+event_end_date: {{eventEndDate}}
+location: {{location}}
+category: {{category}}
+comment: {{comment}}
+---
+
+# {{title}}
+
+URL: {{url}}
+
+## 要約
+
+{{summary}}
+
+## コメント
+
+{{comment}}
+`,
 }
 
 // Supabase Edge Functions のベースパスを環境に応じて決定する
@@ -71,6 +101,8 @@ function normalizeApiClip(raw: Record<string, unknown>): Clip {
     eventEndDate: raw.event_end_date ? String(raw.event_end_date) : null,
     location: raw.location ? String(raw.location) : null,
     aiEnrichmentStatus: (raw.ai_enrichment_status as 'pending' | 'processing' | 'completed' | 'failed') || null,
+    obsidianPending: Boolean(raw.obsidian_pending),
+    obsidianExportedAt: raw.obsidian_exported_at ? String(raw.obsidian_exported_at) : null,
   }
 }
 
@@ -149,6 +181,8 @@ function App() {
   const [sourceSites, setSourceSites] = useState<SourceSite[]>([])
   // AI要約設定の状態
   const [aiSummarySettings, setAiSummarySettings] = useState<AiSummarySettings>(DEFAULT_AI_SUMMARY_SETTINGS)
+  // Obsidian 連携設定の状態
+  const [obsidianSettings, setObsidianSettings] = useState<ObsidianSettings>(DEFAULT_OBSIDIAN_SETTINGS)
   // クリップ収集ダイアログの表示状態
   const [isCollectDialogOpen, setIsCollectDialogOpen] = useState<boolean>(false)
   // 設定ダイアログの表示状態
@@ -221,26 +255,33 @@ function App() {
     }
   }, [session, getAuthHeaders])
 
-  // AI要約設定を取得する
-  const fetchAiSummarySettings = useCallback(async () => {
+  // アプリ設定（AI要約 + Obsidian 連携）を取得する
+  const fetchAppSettings = useCallback(async () => {
     if (!session) return
     try {
       const response = await fetch(`${FUNCTIONS_BASE}/settings`, {
         headers: getAuthHeaders(false),
       })
       if (!response.ok) {
-        throw new Error(`AI要約設定の取得に失敗しました: ${response.status}`)
+        throw new Error(`設定の取得に失敗しました: ${response.status}`)
       }
       const data = await response.json()
-      const settings: AiSummarySettings = data.settings || DEFAULT_AI_SUMMARY_SETTINGS
+      const aiSettings: AiSummarySettings = data.settings || DEFAULT_AI_SUMMARY_SETTINGS
+      const obsSettings: ObsidianSettings = data.obsidianSettings || DEFAULT_OBSIDIAN_SETTINGS
       setAiSummarySettings({
-        enabled: settings.enabled ?? DEFAULT_AI_SUMMARY_SETTINGS.enabled,
-        apiKey: settings.apiKey ?? DEFAULT_AI_SUMMARY_SETTINGS.apiKey,
-        model: settings.model || DEFAULT_AI_SUMMARY_SETTINGS.model,
-        language: settings.language || DEFAULT_AI_SUMMARY_SETTINGS.language,
+        enabled: aiSettings.enabled ?? DEFAULT_AI_SUMMARY_SETTINGS.enabled,
+        apiKey: aiSettings.apiKey ?? DEFAULT_AI_SUMMARY_SETTINGS.apiKey,
+        model: aiSettings.model || DEFAULT_AI_SUMMARY_SETTINGS.model,
+        language: aiSettings.language || DEFAULT_AI_SUMMARY_SETTINGS.language,
+      })
+      setObsidianSettings({
+        apiKey: obsSettings.apiKey ?? DEFAULT_OBSIDIAN_SETTINGS.apiKey,
+        folder: obsSettings.folder ?? DEFAULT_OBSIDIAN_SETTINGS.folder,
+        filenameTemplate: obsSettings.filenameTemplate ?? DEFAULT_OBSIDIAN_SETTINGS.filenameTemplate,
+        noteTemplate: obsSettings.noteTemplate ?? DEFAULT_OBSIDIAN_SETTINGS.noteTemplate,
       })
     } catch (err) {
-      console.error('AI要約設定取得失敗:', err)
+      console.error('設定取得失敗:', err)
     }
   }, [session, getAuthHeaders])
 
@@ -347,8 +388,8 @@ function App() {
       if (!session) return
       if (showLoading) setIsLoading(true)
       try {
-        // AI要約設定も合わせて取得する
-        await fetchAiSummarySettings()
+        // アプリ設定（AI要約 + Obsidian 連携）も合わせて取得する
+        await fetchAppSettings()
 
         // カテゴリを取得する
         const categoryResponse = await fetch(`${FUNCTIONS_BASE}/categories`, {
@@ -395,7 +436,7 @@ function App() {
         if (showLoading) setIsLoading(false)
       }
     },
-    [session, getAuthHeaders, fetchAiSummarySettings, fetchSourceSites],
+    [session, getAuthHeaders, fetchAppSettings, fetchSourceSites],
   )
 
   // 認証後またはセッション変更時にデータを取得する
@@ -601,7 +642,7 @@ function App() {
 
   // クリップ情報を Edge Functions 経由で更新する
   // 成功したらローカル状態も同期する
-  const updateClip = async (id: number, updates: Partial<Pick<Clip, 'categoryId' | 'isPinned' | 'isChecked' | 'comment' | 'eventStartDate' | 'eventEndDate' | 'location'>>) => {
+  const updateClip = async (id: number, updates: Partial<Pick<Clip, 'categoryId' | 'isPinned' | 'isChecked' | 'comment' | 'eventStartDate' | 'eventEndDate' | 'location' | 'obsidianPending'>>) => {
     try {
       // フロントエンドの camelCase プロパティを API の snake_case に変換する
       const body: Record<string, unknown> = {}
@@ -612,6 +653,7 @@ function App() {
       if ('eventStartDate' in updates) body.event_start_date = updates.eventStartDate
       if ('eventEndDate' in updates) body.event_end_date = updates.eventEndDate
       if ('location' in updates) body.location = updates.location
+      if ('obsidianPending' in updates) body.obsidian_pending = updates.obsidianPending
 
       const response = await fetch(`${FUNCTIONS_BASE}/clips/${id}`, {
         method: 'PATCH',
@@ -852,6 +894,39 @@ function App() {
     setIsSettingsDialogOpen(true)
   }
 
+  // Obsidian 連携設定保存時の処理
+  const handleSaveObsidianSettings = async (settings: ObsidianSettings) => {
+    const response = await fetch(`${FUNCTIONS_BASE}/settings`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        obsidianApiKey: settings.apiKey,
+        obsidianFolder: settings.folder,
+        obsidianFilenameTemplate: settings.filenameTemplate,
+        obsidianNoteTemplate: settings.noteTemplate,
+      }),
+    })
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      throw new Error(data.error || 'Obsidian 連携設定の保存に失敗しました')
+    }
+    const data = await response.json()
+    const saved: ObsidianSettings = data.settings || settings
+    setObsidianSettings({
+      apiKey: saved.apiKey ?? settings.apiKey,
+      folder: saved.folder ?? settings.folder,
+      filenameTemplate: saved.filenameTemplate ?? settings.filenameTemplate,
+      noteTemplate: saved.noteTemplate ?? settings.noteTemplate,
+    })
+  }
+
+  // クリップの Obsidian 書き出し予定フラグを切り替える
+  const handleToggleObsidianPending = async (id: number) => {
+    const clip = clips.find((c) => c.id === id)
+    if (!clip) return
+    await updateClip(id, { obsidianPending: !clip.obsidianPending })
+  }
+
   // AI要約設定保存時の処理
   const handleSaveAiSummarySettings = async (settings: AiSummarySettings) => {
     const response = await fetch(`${FUNCTIONS_BASE}/settings`, {
@@ -1048,6 +1123,7 @@ function App() {
         isOpen={isSettingsDialogOpen}
         sourceSites={sourceSites}
         aiSummarySettings={aiSummarySettings}
+        obsidianSettings={obsidianSettings}
         apiKeys={apiKeys}
         isLoadingApiKeys={isLoadingApiKeys}
         apiKeyError={apiKeyError}
@@ -1057,6 +1133,7 @@ function App() {
         onUpdateSourceSiteRssUrl={handleUpdateSourceSiteRssUrl}
         onDeleteSourceSite={handleDeleteSourceSite}
         onSaveAiSummarySettings={handleSaveAiSummarySettings}
+        onSaveObsidianSettings={handleSaveObsidianSettings}
         onFetchApiKeys={fetchApiKeys}
         onCreateApiKey={handleCreateApiKey}
         onDeleteApiKey={handleDeleteApiKey}
@@ -1121,6 +1198,7 @@ function App() {
                   onToggleCheck={handleToggleCheck}
                   onUpdateComment={handleUpdateComment}
                   onUpdateEventInfo={handleUpdateEventInfo}
+                  onToggleObsidianPending={handleToggleObsidianPending}
                   onChangeCategory={handleChangeCategory}
                 />
               )
@@ -1139,6 +1217,7 @@ function App() {
                   onToggleCheck={handleToggleCheck}
                   onUpdateComment={handleUpdateComment}
                   onUpdateEventInfo={handleUpdateEventInfo}
+                  onToggleObsidianPending={handleToggleObsidianPending}
                   onChangeCategory={handleChangeCategory}
                 />
               ) : (
@@ -1157,6 +1236,7 @@ function App() {
                   onToggleCheck={handleToggleCheck}
                   onUpdateComment={handleUpdateComment}
                   onUpdateEventInfo={handleUpdateEventInfo}
+                  onToggleObsidianPending={handleToggleObsidianPending}
                   onRestore={handleRestoreClip}
                   onChangeCategory={handleChangeCategory}
                 />

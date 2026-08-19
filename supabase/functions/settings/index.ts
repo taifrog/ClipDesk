@@ -2,7 +2,7 @@
 
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { getServiceClient, getUserClient, getJwt } from '../_shared/supabase.ts';
-import { getAppSettings, saveAppSettings } from '../_shared/settings.ts';
+import { getAppSettings, saveAiSummarySettings, saveObsidianSettings } from '../_shared/settings.ts';
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req);
@@ -41,19 +41,55 @@ Deno.serve(async (req) => {
     let body: Record<string, unknown>;
     try {
       body = await req.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'JSONボディが不正です' }), {
+    } catch {
+      return new Response(JSON.stringify({ error: 'JSONボディが不正です' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const settings = await saveAppSettings(supabase, userId, {
-      enabled: typeof body.aiSummaryEnabled === 'boolean' ? body.aiSummaryEnabled : undefined,
-      apiKey: typeof body.aiSummaryApiKey === 'string' ? body.aiSummaryApiKey : undefined,
-      model: typeof body.aiSummaryModel === 'string' ? body.aiSummaryModel : undefined,
-      language: typeof body.aiSummaryLanguage === 'string' ? body.aiSummaryLanguage : undefined,
-    });
-    return new Response(JSON.stringify({ ok: true, settings }), {
+
+    // AI 要約設定の保存
+    if (
+      typeof body.aiSummaryEnabled === 'boolean' ||
+      typeof body.aiSummaryApiKey === 'string' ||
+      typeof body.aiSummaryModel === 'string' ||
+      typeof body.aiSummaryLanguage === 'string'
+    ) {
+      const aiSettings = await saveAiSummarySettings(supabase, userId, {
+        enabled: typeof body.aiSummaryEnabled === 'boolean' ? body.aiSummaryEnabled : undefined,
+        apiKey: typeof body.aiSummaryApiKey === 'string' ? body.aiSummaryApiKey : undefined,
+        model: typeof body.aiSummaryModel === 'string' ? body.aiSummaryModel : undefined,
+        language: typeof body.aiSummaryLanguage === 'string' ? body.aiSummaryLanguage : undefined,
+      });
+      return new Response(JSON.stringify({ ok: true, settings: aiSettings }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Obsidian 連携設定の保存
+    if (
+      typeof body.obsidianApiKey === 'string' ||
+      typeof body.obsidianFolder === 'string' ||
+      typeof body.obsidianFilenameTemplate === 'string' ||
+      typeof body.obsidianNoteTemplate === 'string'
+    ) {
+      const obsidianSettings = await saveObsidianSettings(supabase, userId, {
+        apiKey: typeof body.obsidianApiKey === 'string' ? body.obsidianApiKey : undefined,
+        folder: typeof body.obsidianFolder === 'string' ? body.obsidianFolder : undefined,
+        filenameTemplate: typeof body.obsidianFilenameTemplate === 'string'
+          ? body.obsidianFilenameTemplate
+          : undefined,
+        noteTemplate: typeof body.obsidianNoteTemplate === 'string'
+          ? body.obsidianNoteTemplate
+          : undefined,
+      });
+      return new Response(JSON.stringify({ ok: true, settings: obsidianSettings }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify({ error: '更新する設定項目がありません' }), {
+      status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
