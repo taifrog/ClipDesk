@@ -721,6 +721,27 @@
   background: var(--accent-bg);
 }
 
+/* ヘッダー内の Obsidian 一括書き出しボタン */
+.header-obsidian-export {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.header-obsidian-export:hover {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: var(--accent-border);
+}
+
 /* クリップカードの Obsidian 書き出し予定ボタン */
 .clip-card-obsidian {
   display: flex;
@@ -739,6 +760,28 @@
   background: var(--accent-bg);
 }
 
+/* クリップカードの Obsidian 即時書き出しボタン */
+.clip-card-obsidian-export {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.clip-card-obsidian-export:hover {
+  background: var(--accent-bg);
+}
+
+.clip-card-obsidian-export:hover .obsidian-export-icon {
+  fill: var(--accent);
+}
+
 .obsidian-icon {
   width: 18px;
   height: 18px;
@@ -753,6 +796,14 @@
   fill: var(--accent);
   stroke: var(--accent);
   opacity: 1;
+}
+
+.obsidian-export-icon {
+  width: 18px;
+  height: 18px;
+  fill: var(--text);
+  transition: fill 0.2s;
+  opacity: 0.7;
 }
 
 /* Obsidian 連携設定のノートテンプレート入力欄 */

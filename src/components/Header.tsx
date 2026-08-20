@@ -17,6 +17,7 @@ interface HeaderProps {
   selectedCategoryId: string
   onSelectCategory: (categoryId: string) => void
   isMobile: boolean
+  onExportPendingToObsidian?: () => void
 }
 
 // 並び替えモードの表示ラベル
@@ -42,6 +43,7 @@ function SmallIcon({ name }: { name: string }) {
     list: 'M3 5h18v2H3V5zm0 6h18v2H3v-11zm0 6h18v2H3v-2z',
     chevron: 'M7 10l5 5 5-5H7z',
     check: 'M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z',
+    obsidian: 'M10.5 2.5l-8 4.5v10l8 4.5 8-4.5v-10l-8-4.5zM6.5 8.5l4-2.5 4 2.5v7l-4 2.5-4-2.5v-7z',
   }
 
   return (
@@ -64,6 +66,7 @@ export function Header({
   selectedCategoryId,
   onSelectCategory,
   isMobile,
+  onExportPendingToObsidian,
 }: HeaderProps) {
   // 並び替えドロップダウンの開閉状態
   const [isSortOpen, setIsSortOpen] = useState(false)
@@ -154,6 +157,19 @@ export function Header({
             <SmallIcon name="list" />
           </button>
         </div>
+
+        {/* Obsidian 一括書き出しボタン */}
+        {onExportPendingToObsidian && (
+          <button
+            type="button"
+            className="header-obsidian-export"
+            aria-label="Obsidian 書き出し予定のクリップを一括書き出し"
+            onClick={onExportPendingToObsidian}
+            title="Obsidian 書き出し予定のクリップを一括書き出し"
+          >
+            <SmallIcon name="obsidian" />
+          </button>
+        )}
 
         {/* 並び替えドロップダウン */}
         <div className="sort-dropdown" ref={sortRef}>

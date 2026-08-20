@@ -15,6 +15,7 @@ interface ClipCardProps {
   onUpdateComment: (id: number, comment: string) => void
   onUpdateEventInfo?: (id: number, eventInfo: { eventStartDate?: string | null; eventEndDate?: string | null; location?: string | null }) => void
   onToggleObsidianPending?: (id: number) => void
+  onExportToObsidian?: (clip: Clip) => void
   onRestore?: (id: number) => void
   onChangeCategory?: (id: number, categoryId: string) => void
 }
@@ -70,6 +71,15 @@ function CommentIcon() {
 
 // Obsidian アイコンを表示するコンポーネント
 // active: true の時は書き出し予定（塗りつぶし）、false の時は予定なし（枠線）を表示する
+// Obsidian 即時書き出しアイコン（紙飛行機風）を表示するコンポーネント
+function ObsidianExportIcon() {
+  return (
+    <svg className="obsidian-export-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+    </svg>
+  )
+}
+
 function ObsidianIcon({ active }: { active: boolean }) {
   return (
     <svg
@@ -118,6 +128,7 @@ export function ClipCard({
   onUpdateComment,
   onUpdateEventInfo,
   onToggleObsidianPending,
+  onExportToObsidian,
   onRestore,
   onChangeCategory,
 }: ClipCardProps) {
@@ -164,6 +175,11 @@ export function ClipCard({
   // Obsidian 書き出し予定フラグ切り替えボタンクリック時
   const handleObsidianPendingClick = () => {
     onToggleObsidianPending?.(clip.id)
+  }
+
+  // Obsidian 即時書き出しボタンクリック時
+  const handleObsidianExportClick = () => {
+    onExportToObsidian?.(clip)
   }
 
   // コメント編集を確定する
@@ -390,6 +406,14 @@ export function ClipCard({
               onClick={handleObsidianPendingClick}
             >
               <ObsidianIcon active={clip.obsidianPending ?? false} />
+            </button>
+            <button
+              type="button"
+              className="clip-card-obsidian-export"
+              aria-label="Obsidian に今すぐ書き出す"
+              onClick={handleObsidianExportClick}
+            >
+              <ObsidianExportIcon />
             </button>
           </div>
         )}

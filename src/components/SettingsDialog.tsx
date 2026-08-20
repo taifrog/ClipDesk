@@ -539,7 +539,6 @@ export function SettingsDialog({
           <h3 className="settings-section-title">Obsidian 連携設定</h3>
           <p className="dialog-description">
             PC ローカルサーバー経由で Obsidian Local REST API にノートを書き出すための設定です。
-            実際の書き出し処理は今後実装予定です。
           </p>
           <form onSubmit={handleSaveObsidianSettings} className="settings-form settings-form-vertical">
             <div className="form-group">

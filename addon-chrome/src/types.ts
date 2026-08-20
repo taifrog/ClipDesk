@@ -13,6 +13,42 @@ export interface ExtensionMessage {
   payload?: unknown;
 }
 
+// Web アプリから拡張機能経由でローカルサーバーに送る Obsidian 書き出しリクエスト
+export interface ObsidianExportRequest {
+  clip: {
+    title: string;
+    url: string;
+    summary?: string;
+    comment?: string;
+    receivedAt?: string;
+    eventStartDate?: string | null;
+    eventEndDate?: string | null;
+    location?: string | null;
+    categoryId?: string;
+  };
+  categoryName?: string;
+  settings: {
+    apiKey: string;
+    folder?: string;
+    filenameTemplate?: string;
+    noteTemplate?: string;
+  };
+}
+
+// Web アプリから拡張機能に送る Obsidian 書き出しリクエストの完全なペイロード
+export interface ExportToObsidianMessagePayload {
+  clip: ObsidianExportRequest['clip'];
+  categoryName?: string;
+  settings: ObsidianExportRequest['settings'];
+}
+
+// Obsidian 書き出し結果
+export interface ObsidianExportResult {
+  ok: boolean;
+  path?: string;
+  error?: string;
+}
+
 // カテゴリ1件を表す型
 export interface Category {
   id: string;    // カテゴリ識別子

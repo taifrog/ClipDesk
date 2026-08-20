@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "server": "node server/index.mjs",
+    "obsidian-bridge": "node server/obsidian-bridge.mjs",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
@@ -20,6 +21,7 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@types/chrome": "^0.2.6",
     "@types/node": "^24.13.3",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.17",

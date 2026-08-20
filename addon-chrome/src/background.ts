@@ -1,8 +1,11 @@
 // Service Worker（background script）
 // タブ情報の取得、ClipDeskへの投稿を制御する
 
-import type { Category, ClipPayload, ExtensionMessage, ExtensionSettings, PageInfo } from './types';
+import type { Category, ClipPayload, ExtensionMessage, ExtensionSettings, ObsidianExportRequest, ObsidianExportResult, PageInfo } from './types';
 import { loadSettings } from './storage';
+
+// ClipDesk Obsidian Bridge ローカルサーバーのベース URL
+const OBSIDIAN_BRIDGE_BASE_URL = 'http://127.0.0.1:3002';
 
 // デバッグ用ログ出力
 // @param msg 出力するメッセージ
@@ -235,6 +238,74 @@ async function getCategories(): Promise<{ ok: true; categories: Category[] } | {
   }
 }
 
+// Obsidian Bridge ローカルサーバーの生存確認
+// @returns サーバーが応答すれば true
+async function checkObsidianBridgeHealth(): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const response = await fetch(`${OBSIDIAN_BRIDGE_BASE_URL}/health`, { method: 'GET' });
+    if (!response.ok) {
+      throw new Error(`ステータス ${response.status}`);
+    }
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '不明なエラー';
+    debug(`Obsidian Bridge ヘルスチェック失敗: ${message}`);
+    return { ok: false, error: `ローカルサーバーに接続できません。server/obsidian-bridge.mjs を起動してください: ${message}` };
+  }
+}
+
+// Obsidian Bridge ローカルサーバーを経由して Obsidian Local REST API の接続テストを行う
+// @param apiKey Obsidian API キー
+// @returns 接続結果
+async function validateObsidianConnection(apiKey: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const health = await checkObsidianBridgeHealth();
+  if (!health.ok) return health;
+
+  try {
+    const response = await fetch(`${OBSIDIAN_BRIDGE_BASE_URL}/validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey }),
+    });
+    const json = (await response.json()) as { ok: boolean; error?: string };
+    if (!response.ok || !json.ok) {
+      throw new Error(json.error || `ステータス ${response.status}`);
+    }
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '不明なエラー';
+    debug(`Obsidian 接続テスト失敗: ${message}`);
+    return { ok: false, error: message };
+  }
+}
+
+// Obsidian Bridge ローカルサーバーを経由してクリップを Obsidian に書き出す
+// @param request 書き出しリクエスト
+// @returns 書き出し結果
+async function exportToObsidian(request: ObsidianExportRequest): Promise<ObsidianExportResult> {
+  const health = await checkObsidianBridgeHealth();
+  if (!health.ok) {
+    return { ok: false, error: health.error };
+  }
+
+  try {
+    const response = await fetch(`${OBSIDIAN_BRIDGE_BASE_URL}/export`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    });
+    const json = (await response.json()) as { ok: boolean; path?: string; error?: string };
+    if (!response.ok || !json.ok) {
+      throw new Error(json.error || `ステータス ${response.status}`);
+    }
+    return { ok: true, path: json.path };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '不明なエラー';
+    debug(`Obsidian 書き出し失敗: ${message}`);
+    return { ok: false, error: message };
+  }
+}
+
 // 新規カテゴリを作成する
 // @param id カテゴリID
 // @param name カテゴリ表示名
@@ -281,6 +352,17 @@ async function createCategory(
   }
 }
 
+// Web アプリから拡張機能に対してクリップを Obsidian に書き出すよう依頼する
+// @param payload 書き出し対象クリップ、カテゴリ名、Obsidian 設定
+async function handleExportToObsidian(payload: { clip: ObsidianExportRequest['clip']; categoryName?: string; settings: ObsidianExportRequest['settings'] }): Promise<ObsidianExportResult> {
+  const request: ObsidianExportRequest = {
+    clip: payload.clip,
+    categoryName: payload.categoryName,
+    settings: payload.settings,
+  };
+  return exportToObsidian(request);
+}
+
 // 拡張機能からのメッセージを受け取る
 chrome.runtime.onMessage.addListener((request: ExtensionMessage, _sender, sendResponse) => {
   // クリップ作成リクエスト
@@ -315,6 +397,24 @@ chrome.runtime.onMessage.addListener((request: ExtensionMessage, _sender, sendRe
         const message = err instanceof Error ? err.message : '不明なエラー';
         sendResponse({ ok: false, error: message });
       });
+    return true;
+  }
+
+  // Obsidian Local REST API 接続テストリクエスト
+  if (request.type === 'VALIDATE_OBSIDIAN') {
+    const payload = (request.payload as { apiKey?: string }) || {};
+    if (!payload.apiKey) {
+      sendResponse({ ok: false, error: 'apiKey が必要です' });
+      return true;
+    }
+    validateObsidianConnection(payload.apiKey).then(sendResponse);
+    return true;
+  }
+
+  // Obsidian 書き出しリクエスト
+  if (request.type === 'EXPORT_TO_OBSIDIAN') {
+    const payload = (request.payload as { clip: ObsidianExportRequest['clip']; categoryName?: string; settings: ObsidianExportRequest['settings'] }) || {};
+    handleExportToObsidian(payload).then(sendResponse);
     return true;
   }
 

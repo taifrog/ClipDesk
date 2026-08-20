@@ -31,7 +31,7 @@ import { CalendarView } from './components/CalendarView'
 import { AuthPanel } from './components/AuthPanel'
 import ShareTargetPage from './ShareTargetPage'
 import { getSupabaseClient } from './lib/supabase'
-import type { AiSummarySettings, Category, Clip, ObsidianSettings, SortMode, SourceSite, UserApiKey, ViewMode } from './types'
+import type { AiSummarySettings, Category, Clip, ObsidianExportRequest, ObsidianExportResult, ObsidianSettings, SortMode, SourceSite, UserApiKey, ViewMode } from './types'
 import './App.css'
 
 // AI要約設定のデフォルト値
@@ -927,6 +927,125 @@ function App() {
     await updateClip(id, { obsidianPending: !clip.obsidianPending })
   }
 
+  // Chrome 拡張機能がインストールされているかを判定する
+  // chrome.runtime オブジェクトと sendMessage が使える場合は対応拡張機能ありとみなす
+  function isChromeExtensionAvailable(): boolean {
+    return typeof chrome !== 'undefined' && !!chrome.runtime?.sendMessage
+  }
+
+  // クリップを Chrome 拡張機能経由で Obsidian に書き出す
+  // 成功したら obsidianPending を false にし、obsidianExportedAt を更新する
+  async function exportClipToObsidian(clip: Clip, categoryName?: string): Promise<ObsidianExportResult> {
+    if (!isChromeExtensionAvailable()) {
+      return { ok: false, error: 'Chrome 拡張機能が見つかりません。拡張機能をインストール・有効化してください。' }
+    }
+
+    const payload: ObsidianExportRequest = {
+      clip: {
+        title: clip.title,
+        url: clip.url,
+        summary: clip.summary,
+        comment: clip.comment,
+        receivedAt: clip.receivedAt,
+        eventStartDate: clip.eventStartDate,
+        eventEndDate: clip.eventEndDate,
+        location: clip.location,
+        categoryId: clip.categoryId,
+      },
+      categoryName,
+      settings: {
+        apiKey: obsidianSettings.apiKey,
+        folder: obsidianSettings.folder,
+        filenameTemplate: obsidianSettings.filenameTemplate,
+        noteTemplate: obsidianSettings.noteTemplate,
+      },
+    }
+
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        { type: 'EXPORT_TO_OBSIDIAN', payload },
+        (result: ObsidianExportResult | undefined) => {
+          if (chrome.runtime.lastError) {
+            resolve({ ok: false, error: chrome.runtime.lastError.message || '拡張機能との通信に失敗しました' })
+            return
+          }
+          resolve(result || { ok: false, error: '拡張機能からの応答が空です' })
+        },
+      )
+    })
+  }
+
+  // クリップ1件を即座に Obsidian に書き出す
+  const handleExportToObsidian = async (clip: Clip) => {
+    if (!obsidianSettings.apiKey) {
+      window.alert('Obsidian Local REST API キーが設定されていません。設定から入力してください。')
+      return
+    }
+    const category = categories.find((c) => c.id === clip.categoryId)
+    const result = await exportClipToObsidian(clip, category?.name)
+    if (!result.ok) {
+      window.alert(`Obsidian への書き出しに失敗しました:\n${result.error}`)
+      return
+    }
+    await updateClip(clip.id, { obsidianPending: false })
+    // 成功したらローカル状態の exportedAt も更新する
+    setClips((prev) =>
+      prev.map((c) => (c.id === clip.id ? { ...c, obsidianPending: false, obsidianExportedAt: new Date().toISOString() } : c)),
+    )
+    window.alert(`Obsidian に書き出しました:\n${result.path}`)
+  }
+
+  // Obsidian 書き出し予定のクリップを一括で書き出す
+  const handleExportPendingToObsidian = async () => {
+    if (!obsidianSettings.apiKey) {
+      window.alert('Obsidian Local REST API キーが設定されていません。設定から入力してください。')
+      return
+    }
+    const pendingClips = clips.filter((clip) => clip.obsidianPending)
+    if (pendingClips.length === 0) {
+      window.alert('Obsidian 書き出し予定のクリップはありません。')
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Obsidian 書き出し予定のクリップ ${pendingClips.length}件を書き出しますか？`,
+    )
+    if (!confirmed) return
+
+    const now = new Date().toISOString()
+    const results: { clip: Clip; result: ObsidianExportResult }[] = []
+    for (const clip of pendingClips) {
+      const category = categories.find((c) => c.id === clip.categoryId)
+      const result = await exportClipToObsidian(clip, category?.name)
+      results.push({ clip, result })
+      if (result.ok) {
+        // 成功したら各クリップを個別に更新する
+        await updateClip(clip.id, { obsidianPending: false })
+      }
+    }
+
+    const succeeded = results.filter((r) => r.result.ok)
+    const failed = results.filter((r) => !r.result.ok)
+
+    // ローカル状態を一括で更新する
+    setClips((prev) =>
+      prev.map((c) => {
+        const r = results.find((item) => item.clip.id === c.id)
+        if (r && r.result.ok) {
+          return { ...c, obsidianPending: false, obsidianExportedAt: now }
+        }
+        return c
+      }),
+    )
+
+    if (failed.length === 0) {
+      window.alert(`${succeeded.length}件のクリップを Obsidian に書き出しました。`)
+    } else {
+      const messages = failed.map((r) => `・${r.clip.title}\n  ${r.result.error}`).join('\n')
+      window.alert(`${succeeded.length}件の書き出しに成功しました。\n${failed.length}件が失敗しました:\n${messages}`)
+    }
+  }
+
   // AI要約設定保存時の処理
   const handleSaveAiSummarySettings = async (settings: AiSummarySettings) => {
     const response = await fetch(`${FUNCTIONS_BASE}/settings`, {
@@ -1155,6 +1274,7 @@ function App() {
           selectedCategoryId={selectedCategoryId}
           onSelectCategory={handleSelectCategory}
           isMobile={isMobile}
+          onExportPendingToObsidian={handleExportPendingToObsidian}
         />
 
         <div className="clip-content">
@@ -1199,6 +1319,7 @@ function App() {
                   onUpdateComment={handleUpdateComment}
                   onUpdateEventInfo={handleUpdateEventInfo}
                   onToggleObsidianPending={handleToggleObsidianPending}
+                  onExportToObsidian={handleExportToObsidian}
                   onChangeCategory={handleChangeCategory}
                 />
               )
@@ -1218,6 +1339,7 @@ function App() {
                   onUpdateComment={handleUpdateComment}
                   onUpdateEventInfo={handleUpdateEventInfo}
                   onToggleObsidianPending={handleToggleObsidianPending}
+                  onExportToObsidian={handleExportToObsidian}
                   onChangeCategory={handleChangeCategory}
                 />
               ) : (
@@ -1237,6 +1359,7 @@ function App() {
                   onUpdateComment={handleUpdateComment}
                   onUpdateEventInfo={handleUpdateEventInfo}
                   onToggleObsidianPending={handleToggleObsidianPending}
+                  onExportToObsidian={handleExportToObsidian}
                   onRestore={handleRestoreClip}
                   onChangeCategory={handleChangeCategory}
                 />

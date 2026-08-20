@@ -83,6 +83,35 @@ export interface ObsidianSettings {
   noteTemplate: string
 }
 
+// Web アプリから Chrome 拡張機能へ送る Obsidian 書き出しリクエストのペイロード
+export interface ObsidianExportRequest {
+  clip: {
+    title: string
+    url: string
+    summary?: string
+    comment?: string
+    receivedAt?: string
+    eventStartDate?: string | null
+    eventEndDate?: string | null
+    location?: string | null
+    categoryId?: string
+  }
+  categoryName?: string
+  settings: {
+    apiKey: string
+    folder?: string
+    filenameTemplate?: string
+    noteTemplate?: string
+  }
+}
+
+// Obsidian 書き出し結果を表す型
+export interface ObsidianExportResult {
+  ok: boolean
+  path?: string
+  error?: string
+}
+
 // Chrome 拡張機能等で使用する API キー1件を表す型
 export interface UserApiKey {
   id: number
