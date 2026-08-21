@@ -91,7 +91,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const aiSettings = await getAppSettings(supabase, userId);
+    const appSettings = await getAppSettings(supabase, userId);
+    const aiSettings = appSettings.aiSummary;
+    debug(`enrich-clip: getAppSettings 結果: enabled=${aiSettings.enabled}, apiKey存在=${!!aiSettings.apiKey}, model=${aiSettings.model}`);
 
     // AI 要約用の入力テキストを構築する
     // 優先順位: rawBody > 共有テキスト（URL除去） > URL から取得した HTML

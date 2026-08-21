@@ -4,6 +4,13 @@ import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { getServiceClient, getUserClient, getJwt } from '../_shared/supabase.ts';
 import { getAppSettings, saveAiSummarySettings, saveObsidianSettings } from '../_shared/settings.ts';
 
+// デバッグメッセージ出力用関数
+// @param msg 出力する文字列
+function debug(msg: string) {
+  // 開発時は有効、本番はここをコメントアウト
+  console.log(`[DEBUG] ${msg}`);
+}
+
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -47,6 +54,8 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    debug(`settings POST body: aiSummaryEnabled=${body.aiSummaryEnabled}, aiSummaryApiKey存在=${typeof body.aiSummaryApiKey === 'string'}, aiSummaryModel=${body.aiSummaryModel}, obsidianApiKey存在=${typeof body.obsidianApiKey === 'string'}`);
 
     // AI 要約設定の保存
     if (
