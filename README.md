@@ -97,6 +97,8 @@ npm run build
 - **Supabase URL**: 使用している Supabase プロジェクトの URL（既定値が表示されていればそのままで可）
 - **API キー**: ClipDesk サイトの「設定」→「拡張機能 API キー」で発行したキー
 
+> **Note:** Web アプリから Chrome 拡張機能を経由して Obsidian に書き出すには、拡張機能の `manifest.json` に `externally_connectable` として Web アプリのオリジンが登録されている必要があります。本プロジェクトでは `https://taifrog.github.io/ClipDesk/*` と `http://localhost:5173/*` が既定で登録されています。別のオリジンでホスティングする場合は `addon-chrome/src/manifest.json` を修正し、拡張機能を再ビルドしてください。
+
 設定は、ClipDesk サイトの「設定」で API キーを発行後に表示される「拡張機能設定をコピー」ボタンから JSON をコピーし、拡張機能のオプション画面に貼り付けることもできます。
 
 ### 8. クリップを投稿する
