@@ -266,8 +266,9 @@ function App() {
         throw new Error(`設定の取得に失敗しました: ${response.status}`)
       }
       const data = await response.json()
-      const aiSettings: AiSummarySettings = data.settings || DEFAULT_AI_SUMMARY_SETTINGS
-      const obsSettings: ObsidianSettings = data.obsidianSettings || DEFAULT_OBSIDIAN_SETTINGS
+      // Edge Function は { settings: { aiSummary, obsidian } } の形で返す
+      const aiSettings: AiSummarySettings = data.settings?.aiSummary || DEFAULT_AI_SUMMARY_SETTINGS
+      const obsSettings: ObsidianSettings = data.settings?.obsidian || DEFAULT_OBSIDIAN_SETTINGS
       setAiSummarySettings({
         enabled: aiSettings.enabled ?? DEFAULT_AI_SUMMARY_SETTINGS.enabled,
         apiKey: aiSettings.apiKey ?? DEFAULT_AI_SUMMARY_SETTINGS.apiKey,
