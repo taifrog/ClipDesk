@@ -437,6 +437,19 @@ chrome.runtime.onMessage.addListener((request: ExtensionMessage, _sender, sendRe
   return false;
 });
 
+// Web アプリなど外部 origin からのメッセージを受け取る
+// externally_connectable で許可した origin からのみ到達可能
+chrome.runtime.onMessageExternal.addListener((request: ExtensionMessage, _sender, sendResponse) => {
+  // Obsidian 書き出しリクエスト
+  if (request.type === 'EXPORT_TO_OBSIDIAN') {
+    const payload = (request.payload as { clip: ObsidianExportRequest['clip']; categoryName?: string; settings: ObsidianExportRequest['settings'] }) || {};
+    handleExportToObsidian(payload).then(sendResponse);
+    return true;
+  }
+
+  return false;
+});
+
 // インストール時の初期化
 chrome.runtime.onInstalled.addListener(() => {
   debug('ClipDesk extension installed');
