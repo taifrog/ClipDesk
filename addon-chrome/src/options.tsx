@@ -10,13 +10,37 @@ function Options() {
   const [settings, setSettings] = useState<ExtensionSettings | null>(null);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string>('');
+  // 拡張機能 ID のコピー完了表示
+  const [extensionIdCopied, setExtensionIdCopied] = useState(false);
+  // 現在の拡張機能 ID（chrome.runtime.id が利用可能な場合のみ）
+  const [extensionId, setExtensionId] = useState<string>('');
 
   // 保存済みの設定を読み込む
   useEffect(() => {
     loadSettings()
       .then(setSettings)
       .catch((err) => setError(err.message || '設定を読み込めませんでした'));
+
+    // 拡張機能 ID を取得して表示する
+    // chrome.runtime.id は拡張機能内からのみ参照可能
+    if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
+      setExtensionId(chrome.runtime.id);
+    }
   }, []);
+
+  // 拡張機能 ID をクリップボードにコピーする
+  async function handleCopyExtensionId() {
+    if (!extensionId) return;
+    try {
+      await navigator.clipboard.writeText(extensionId);
+      setExtensionIdCopied(true);
+      // 3秒後にコピー完了表示を消す
+      window.setTimeout(() => setExtensionIdCopied(false), 3000);
+    } catch (err) {
+      console.error('拡張機能 ID のコピー失敗:', err);
+      setError('拡張機能 ID のコピーに失敗しました');
+    }
+  }
 
   // 入力値をローカル状態に反映する
   function handleChange(field: keyof ExtensionSettings, value: string) {
@@ -112,6 +136,34 @@ function Options() {
           >
             既定値に戻す
           </button>
+        </div>
+
+        <hr style={{ margin: '24px 0', border: 'none', borderTop: '1px solid #ddd' }} />
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'block', marginBottom: 4, fontWeight: 'bold' }}>
+            拡張機能 ID
+          </label>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="text"
+              value={extensionId}
+              readOnly
+              style={{ flex: 1, padding: 8, fontSize: 14, backgroundColor: '#f5f5f5' }}
+              placeholder="拡張機能 ID を取得できません"
+            />
+            <button
+              type="button"
+              onClick={handleCopyExtensionId}
+              disabled={!extensionId || extensionIdCopied}
+              style={{ padding: '8px 16px', fontSize: 14, cursor: 'pointer' }}
+            >
+              {extensionIdCopied ? 'コピーしました' : 'コピー'}
+            </button>
+          </div>
+          <p style={{ margin: '4px 0 0', fontSize: 12, color: '#666' }}>
+            Web アプリの設定画面で Chrome 拡張機能 ID 欄に貼り付けてください。
+          </p>
         </div>
 
         {saved && <p style={{ color: '#2a7', marginTop: 12 }}>保存しました</p>}

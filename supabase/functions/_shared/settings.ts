@@ -1,7 +1,7 @@
 // アプリ設定取得用ヘルパー
 
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.49.0';
-import { AiSummarySettings, ObsidianSettings } from './ai.ts';
+import { AiSummarySettings, ExtensionSettings, ObsidianSettings } from './ai.ts';
 
 // デバッグメッセージ出力用関数
 // @param msg 出力する文字列
@@ -48,10 +48,16 @@ URL: {{url}}
 `,
 };
 
-// アプリ設定全体（AI 要約設定 + Obsidian 連携設定）
+// 拡張機能連携設定のデフォルト値
+const DEFAULT_EXTENSION_SETTINGS: ExtensionSettings = {
+  extensionId: '',
+};
+
+// アプリ設定全体（AI 要約設定 + Obsidian 連携設定 + 拡張機能連携設定）
 export interface AppSettings {
   aiSummary: AiSummarySettings;
   obsidian: ObsidianSettings;
+  extension: ExtensionSettings;
 }
 
 // 指定ユーザーのアプリ設定全体を取得する
@@ -63,7 +69,7 @@ export async function getAppSettings(
   const { data, error } = await supabase
     .from('app_settings')
     .select(
-      'ai_summary_enabled, ai_summary_api_key, ai_summary_model, ai_summary_language, obsidian_api_key, obsidian_folder, obsidian_filename_template, obsidian_note_template',
+      'ai_summary_enabled, ai_summary_api_key, ai_summary_model, ai_summary_language, obsidian_api_key, obsidian_folder, obsidian_filename_template, obsidian_note_template, extension_id',
     )
     .eq('user_id', userId)
     .maybeSingle();
@@ -72,6 +78,7 @@ export async function getAppSettings(
     return {
       aiSummary: DEFAULT_AI_SUMMARY_SETTINGS,
       obsidian: DEFAULT_OBSIDIAN_SETTINGS,
+      extension: DEFAULT_EXTENSION_SETTINGS,
     };
   }
 
@@ -92,6 +99,9 @@ export async function getAppSettings(
       folder: data.obsidian_folder ?? DEFAULT_OBSIDIAN_SETTINGS.folder,
       filenameTemplate: data.obsidian_filename_template ?? DEFAULT_OBSIDIAN_SETTINGS.filenameTemplate,
       noteTemplate: data.obsidian_note_template ?? DEFAULT_OBSIDIAN_SETTINGS.noteTemplate,
+    },
+    extension: {
+      extensionId: data.extension_id ?? DEFAULT_EXTENSION_SETTINGS.extensionId,
     },
   };
 }
@@ -138,4 +148,21 @@ export async function saveObsidianSettings(
   await supabase.from('app_settings').upsert(upsert, { onConflict: 'user_id' });
   const updated = await getAppSettings(supabase, userId);
   return updated.obsidian;
+}
+
+// 指定ユーザーの Chrome 拡張機能連携設定を保存する
+export async function saveExtensionSettings(
+  supabase: SupabaseClient,
+  userId: string,
+  settings: Partial<ExtensionSettings>,
+): Promise<ExtensionSettings> {
+  const upsert: Record<string, unknown> = {
+    user_id: userId,
+  };
+  if (typeof settings.extensionId === 'string') upsert.extension_id = settings.extensionId;
+
+  debug(`saveExtensionSettings upsert: extensionId=${typeof upsert.extension_id === 'string' ? '(set)' : '(not set)'}`);
+  await supabase.from('app_settings').upsert(upsert, { onConflict: 'user_id' });
+  const updated = await getAppSettings(supabase, userId);
+  return updated.extension;
 }

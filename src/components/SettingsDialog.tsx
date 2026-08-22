@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
-import type { AiSummarySettings, ObsidianSettings, SourceSite, UserApiKey } from '../types'
+import type { AiSummarySettings, ExtensionSettings, ObsidianSettings, SourceSite, UserApiKey } from '../types'
 
 // 設定ダイアログのプロパティ
 interface SettingsDialogProps {
@@ -8,6 +8,7 @@ interface SettingsDialogProps {
   sourceSites: SourceSite[]
   aiSummarySettings: AiSummarySettings
   obsidianSettings: ObsidianSettings
+  extensionSettings: ExtensionSettings
   apiKeys: UserApiKey[]
   isLoadingApiKeys: boolean
   apiKeyError: string | null
@@ -19,6 +20,7 @@ interface SettingsDialogProps {
   onDeleteSourceSite: (id: number) => Promise<void>
   onSaveAiSummarySettings: (settings: AiSummarySettings) => Promise<void>
   onSaveObsidianSettings: (settings: ObsidianSettings) => Promise<void>
+  onSaveExtensionSettings: (settings: ExtensionSettings) => Promise<void>
   onFetchApiKeys: () => Promise<void>
   onCreateApiKey: (label: string) => Promise<void>
   onDeleteApiKey: (id: number) => Promise<void>
@@ -36,6 +38,11 @@ const DEFAULT_AI_SUMMARY_SETTINGS: AiSummarySettings = {
   apiKey: '',
   model: 'gpt-4o-mini',
   language: 'ja',
+}
+
+// Chrome 拡張機能連携のデフォルト設定値
+const DEFAULT_EXTENSION_SETTINGS: ExtensionSettings = {
+  extensionId: '',
 }
 
 // Obsidian 連携のデフォルト設定値
@@ -75,6 +82,7 @@ export function SettingsDialog({
   sourceSites,
   aiSummarySettings,
   obsidianSettings,
+  extensionSettings,
   apiKeys,
   isLoadingApiKeys,
   apiKeyError,
@@ -85,6 +93,7 @@ export function SettingsDialog({
   onDeleteSourceSite,
   onSaveAiSummarySettings,
   onSaveObsidianSettings,
+  onSaveExtensionSettings,
   onFetchApiKeys,
   onCreateApiKey,
   onDeleteApiKey,
@@ -123,6 +132,13 @@ export function SettingsDialog({
   const [isSavingObsidianSettings, setIsSavingObsidianSettings] = useState<boolean>(false)
   // Obsidian 連携設定保存完了メッセージ
   const [obsidianSettingsSavedMessage, setObsidianSettingsSavedMessage] = useState<string | null>(null)
+
+  // Chrome 拡張機能連携設定のローカル編集用状態
+  const [localExtensionSettings, setLocalExtensionSettings] = useState<ExtensionSettings>(DEFAULT_EXTENSION_SETTINGS)
+  // Chrome 拡張機能連携設定保存中フラグ
+  const [isSavingExtensionSettings, setIsSavingExtensionSettings] = useState<boolean>(false)
+  // Chrome 拡張機能連携設定保存完了メッセージ
+  const [extensionSettingsSavedMessage, setExtensionSettingsSavedMessage] = useState<string | null>(null)
 
   // API キー新規発行用のラベル
   const [apiKeyLabel, setApiKeyLabel] = useState<string>('')
@@ -169,10 +185,14 @@ export function SettingsDialog({
         noteTemplate: obsidianSettings.noteTemplate ?? DEFAULT_OBSIDIAN_SETTINGS.noteTemplate,
       })
       setObsidianSettingsSavedMessage(null)
+      setLocalExtensionSettings({
+        extensionId: extensionSettings.extensionId ?? DEFAULT_EXTENSION_SETTINGS.extensionId,
+      })
+      setExtensionSettingsSavedMessage(null)
       // API キー一覧を取得する
       onFetchApiKeys().catch((err) => console.error('API キー一覧取得失敗:', err))
     }
-  }, [isOpen, aiSummarySettings, obsidianSettings, onFetchApiKeys])
+  }, [isOpen, aiSummarySettings, obsidianSettings, extensionSettings, onFetchApiKeys])
 
   // ダイアログを閉じるときに新規発行キー表示をクリアする
   const handleClose = () => {
@@ -453,6 +473,30 @@ export function SettingsDialog({
       setError(err instanceof Error ? err.message : 'Obsidian 連携設定の保存に失敗しました')
     } finally {
       setIsSavingObsidianSettings(false)
+    }
+  }
+
+  // Chrome 拡張機能連携設定の入力値変更時の処理
+  const handleExtensionSettingsChange = (updates: Partial<ExtensionSettings>) => {
+    setLocalExtensionSettings((prev) => ({ ...prev, ...updates }))
+    // 入力が変わったら保存済みメッセージを消す
+    setExtensionSettingsSavedMessage(null)
+  }
+
+  // Chrome 拡張機能連携設定保存ボタン押下時の処理
+  const handleSaveExtensionSettings = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSavingExtensionSettings(true)
+    setError(null)
+    try {
+      await onSaveExtensionSettings({
+        extensionId: localExtensionSettings.extensionId.trim(),
+      })
+      setExtensionSettingsSavedMessage('Chrome 拡張機能連携設定を保存しました')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Chrome 拡張機能連携設定の保存に失敗しました')
+    } finally {
+      setIsSavingExtensionSettings(false)
     }
   }
 
@@ -746,6 +790,31 @@ export function SettingsDialog({
             <button type="submit" className="button-primary" disabled={isCreatingApiKey}>
               {isCreatingApiKey ? '発行中…' : 'API キーを発行'}
             </button>
+          </form>
+
+          <form onSubmit={handleSaveExtensionSettings} className="settings-form settings-form-vertical">
+            <div className="form-group">
+              <label htmlFor="chrome-extension-id">Chrome 拡張機能 ID</label>
+              <input
+                id="chrome-extension-id"
+                type="text"
+                value={localExtensionSettings.extensionId}
+                onChange={(e) => handleExtensionSettingsChange({ extensionId: e.target.value })}
+                placeholder="abcdefghijklmnopabcdefghijklmnop"
+                disabled={isSavingExtensionSettings}
+              />
+              <p className="dialog-description">
+                Obsidian 書き出し時にメッセージを送る先の Chrome 拡張機能 ID です。空欄の場合は自動的に拡張機能を探します。拡張機能のオプション画面で ID を確認できます。
+              </p>
+            </div>
+            <div className="settings-form-actions">
+              <button type="submit" className="button-primary" disabled={isSavingExtensionSettings}>
+                {isSavingExtensionSettings ? '保存中…' : '拡張機能 ID を保存'}
+              </button>
+              {extensionSettingsSavedMessage && (
+                <span className="save-success-message">{extensionSettingsSavedMessage}</span>
+              )}
+            </div>
           </form>
 
           {newlyCreatedKey && (

@@ -83,6 +83,13 @@ export interface ObsidianSettings {
   noteTemplate: string
 }
 
+// Chrome 拡張機能連携設定を表す型
+// Web アプリから拡張機能へ sendMessage する際の拡張機能 ID を保持する
+export interface ExtensionSettings {
+  // Chrome 拡張機能の ID（空文字の場合は ID を指定せずに送信する）
+  extensionId: string
+}
+
 // Web アプリから Chrome 拡張機能へ送る Obsidian 書き出しリクエストのペイロード
 export interface ObsidianExportRequest {
   clip: {

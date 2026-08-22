@@ -31,7 +31,7 @@ import { CalendarView } from './components/CalendarView'
 import { AuthPanel } from './components/AuthPanel'
 import ShareTargetPage from './ShareTargetPage'
 import { getSupabaseClient } from './lib/supabase'
-import type { AiSummarySettings, Category, Clip, ObsidianExportRequest, ObsidianExportResult, ObsidianSettings, SortMode, SourceSite, UserApiKey, ViewMode } from './types'
+import type { AiSummarySettings, Category, Clip, ExtensionSettings, ObsidianExportRequest, ObsidianExportResult, ObsidianSettings, SortMode, SourceSite, UserApiKey, ViewMode } from './types'
 import './App.css'
 
 // AI要約設定のデフォルト値
@@ -40,6 +40,11 @@ const DEFAULT_AI_SUMMARY_SETTINGS: AiSummarySettings = {
   apiKey: '',
   model: 'gpt-4o-mini',
   language: 'ja',
+}
+
+// Chrome 拡張機能連携設定のデフォルト値
+const DEFAULT_EXTENSION_SETTINGS: ExtensionSettings = {
+  extensionId: '',
 }
 
 // Obsidian 連携設定のデフォルト値
@@ -183,6 +188,8 @@ function App() {
   const [aiSummarySettings, setAiSummarySettings] = useState<AiSummarySettings>(DEFAULT_AI_SUMMARY_SETTINGS)
   // Obsidian 連携設定の状態
   const [obsidianSettings, setObsidianSettings] = useState<ObsidianSettings>(DEFAULT_OBSIDIAN_SETTINGS)
+  // Chrome 拡張機能連携設定の状態
+  const [extensionSettings, setExtensionSettings] = useState<ExtensionSettings>(DEFAULT_EXTENSION_SETTINGS)
   // クリップ収集ダイアログの表示状態
   const [isCollectDialogOpen, setIsCollectDialogOpen] = useState<boolean>(false)
   // 設定ダイアログの表示状態
@@ -269,6 +276,7 @@ function App() {
       // Edge Function は { settings: { aiSummary, obsidian } } の形で返す
       const aiSettings: AiSummarySettings = data.settings?.aiSummary || DEFAULT_AI_SUMMARY_SETTINGS
       const obsSettings: ObsidianSettings = data.settings?.obsidian || DEFAULT_OBSIDIAN_SETTINGS
+      const extSettings: ExtensionSettings = data.settings?.extension || DEFAULT_EXTENSION_SETTINGS
       setAiSummarySettings({
         enabled: aiSettings.enabled ?? DEFAULT_AI_SUMMARY_SETTINGS.enabled,
         apiKey: aiSettings.apiKey ?? DEFAULT_AI_SUMMARY_SETTINGS.apiKey,
@@ -280,6 +288,9 @@ function App() {
         folder: obsSettings.folder ?? DEFAULT_OBSIDIAN_SETTINGS.folder,
         filenameTemplate: obsSettings.filenameTemplate ?? DEFAULT_OBSIDIAN_SETTINGS.filenameTemplate,
         noteTemplate: obsSettings.noteTemplate ?? DEFAULT_OBSIDIAN_SETTINGS.noteTemplate,
+      })
+      setExtensionSettings({
+        extensionId: extSettings.extensionId ?? DEFAULT_EXTENSION_SETTINGS.extensionId,
       })
     } catch (err) {
       console.error('設定取得失敗:', err)
@@ -895,6 +906,26 @@ function App() {
     setIsSettingsDialogOpen(true)
   }
 
+  // Chrome 拡張機能連携設定保存時の処理
+  const handleSaveExtensionSettings = async (settings: ExtensionSettings) => {
+    const response = await fetch(`${FUNCTIONS_BASE}/settings`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        extensionId: settings.extensionId,
+      }),
+    })
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      throw new Error(data.error || 'Chrome 拡張機能連携設定の保存に失敗しました')
+    }
+    const data = await response.json()
+    const saved: ExtensionSettings = data.settings || settings
+    setExtensionSettings({
+      extensionId: saved.extensionId ?? settings.extensionId,
+    })
+  }
+
   // Obsidian 連携設定保存時の処理
   const handleSaveObsidianSettings = async (settings: ObsidianSettings) => {
     const response = await fetch(`${FUNCTIONS_BASE}/settings`, {
@@ -966,7 +997,9 @@ function App() {
     }
 
     return new Promise((resolve) => {
+      const targetId = extensionSettings.extensionId || undefined
       chrome.runtime.sendMessage(
+        targetId,
         { type: 'EXPORT_TO_OBSIDIAN', payload },
         (result: ObsidianExportResult | undefined) => {
           if (chrome.runtime.lastError) {
@@ -1249,6 +1282,7 @@ function App() {
         sourceSites={sourceSites}
         aiSummarySettings={aiSummarySettings}
         obsidianSettings={obsidianSettings}
+        extensionSettings={extensionSettings}
         apiKeys={apiKeys}
         isLoadingApiKeys={isLoadingApiKeys}
         apiKeyError={apiKeyError}
@@ -1259,6 +1293,7 @@ function App() {
         onDeleteSourceSite={handleDeleteSourceSite}
         onSaveAiSummarySettings={handleSaveAiSummarySettings}
         onSaveObsidianSettings={handleSaveObsidianSettings}
+        onSaveExtensionSettings={handleSaveExtensionSettings}
         onFetchApiKeys={fetchApiKeys}
         onCreateApiKey={handleCreateApiKey}
         onDeleteApiKey={handleDeleteApiKey}

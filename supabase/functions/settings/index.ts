@@ -2,7 +2,7 @@
 
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { getServiceClient, getUserClient, getJwt } from '../_shared/supabase.ts';
-import { getAppSettings, saveAiSummarySettings, saveObsidianSettings } from '../_shared/settings.ts';
+import { getAppSettings, saveAiSummarySettings, saveObsidianSettings, saveExtensionSettings } from '../_shared/settings.ts';
 
 // デバッグメッセージ出力用関数
 // @param msg 出力する文字列
@@ -93,6 +93,16 @@ Deno.serve(async (req) => {
           : undefined,
       });
       return new Response(JSON.stringify({ ok: true, settings: obsidianSettings }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Chrome 拡張機能連携設定の保存
+    if (typeof body.extensionId === 'string') {
+      const extensionSettings = await saveExtensionSettings(supabase, userId, {
+        extensionId: body.extensionId,
+      });
+      return new Response(JSON.stringify({ ok: true, settings: extensionSettings }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
