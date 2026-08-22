@@ -7,10 +7,21 @@ import { loadSettings } from './storage';
 // ClipDesk Obsidian Bridge ローカルサーバーのベース URL
 const OBSIDIAN_BRIDGE_BASE_URL = 'http://127.0.0.1:3002';
 
+// Service Worker 内で保持するログエントリ
+const logEntries: string[] = [];
+const MAX_LOG_ENTRIES = 200;
+
 // デバッグ用ログ出力
+// コンソールとメモリ上のログバッファの両方に出力する
 // @param msg 出力するメッセージ
 function debug(msg: string): void {
-  console.log('[ClipDesk BG]', msg);
+  const timestamp = new Date().toISOString();
+  const line = `[${timestamp}] [ClipDesk BG] ${msg}`;
+  console.log(line);
+  logEntries.push(line);
+  if (logEntries.length > MAX_LOG_ENTRIES) {
+    logEntries.shift();
+  }
 }
 
 // 設定を取得する
@@ -283,21 +294,26 @@ async function validateObsidianConnection(apiKey: string): Promise<{ ok: true } 
 // @param request 書き出しリクエスト
 // @returns 書き出し結果
 async function exportToObsidian(request: ObsidianExportRequest): Promise<ObsidianExportResult> {
+  debug(`Obsidian 書き出し開始: title=${request.clip.title?.slice(0, 40)}, folder=${request.settings.folder}`);
   const health = await checkObsidianBridgeHealth();
   if (!health.ok) {
+    debug(`Obsidian 書き出し中止: ${health.error}`);
     return { ok: false, error: health.error };
   }
 
   try {
+    debug(`Obsidian Bridge へリクエスト送信: ${OBSIDIAN_BRIDGE_BASE_URL}/export`);
     const response = await fetch(`${OBSIDIAN_BRIDGE_BASE_URL}/export`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request),
     });
     const json = (await response.json()) as { ok: boolean; path?: string; error?: string };
+    debug(`Obsidian Bridge 応答: status=${response.status}, ok=${json.ok}, path=${json.path || 'none'}`);
     if (!response.ok || !json.ok) {
       throw new Error(json.error || `ステータス ${response.status}`);
     }
+    debug(`Obsidian 書き出し成功: ${json.path}`);
     return { ok: true, path: json.path };
   } catch (err) {
     const message = err instanceof Error ? err.message : '不明なエラー';

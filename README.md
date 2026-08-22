@@ -101,19 +101,68 @@ npm run build
 
 設定は、ClipDesk サイトの「設定」で API キーを発行後に表示される「拡張機能設定をコピー」ボタンから JSON をコピーし、拡張機能のオプション画面に貼り付けることもできます。
 
-### 8. クリップを投稿する
+### 8. Obsidian 連携を使う（オプション）
+
+Web アプリからクリップを Obsidian に書き出すには、以下を起動・設定してください。
+
+#### 前提
+
+- Obsidian に [Local REST API プラグイン](https://github.com/coddingtonbear/obsidian-local-rest-api) がインストール・有効化されている
+- プラグインの API キーを取得している
+
+#### ローカルブリッジを起動する
+
+```bash
+cd c:/data/Github/ClipDesk
+node server/obsidian-bridge.mjs
+```
+
+既定で `http://127.0.0.1:3002` で起動します。以下の環境変数で設定を変更できます。
+
+| 環境変数 | 既定値 | 説明 |
+| --- | --- | --- |
+| `OBSIDIAN_BRIDGE_PORT` | `3002` | ローカルブリッジの待受ポート |
+| `OBSIDIAN_BASE_URL` | `http://127.0.0.1:27123` | Obsidian Local REST API の URL |
+
+起動すると、同時に `logs/obsidian-bridge.log` にもログが書き込まれます。
+
+#### ClipDesk サイトで設定する
+
+1. Web アプリの「設定」→「Obsidian 連携」を開く
+2. **Obsidian API キー** に Local REST API プラグインの API キーを入力
+3. **Obsidian Local REST API URL** に `http://127.0.0.1:27123`（既定値）を入力
+4. **Obsidian Bridge URL** に `http://127.0.0.1:3002`（既定値）を入力
+5. 「接続テスト」ボタンでブリッジ → Obsidian までの接続を確認
+
+接続テストが成功したら、クリップカードの「Obsidian に書き出し」ボタンからクリップを書き出せます。
+
+#### ログ確認のポイント
+
+Obsidian 書き出しが動作しない場合は、以下のログを確認してください。
+
+| 場所 | 確認方法 |
+| --- | --- |
+| Web アプリ | ブラウザの開発者ツール（F12）→ Console |
+| Chrome 拡張機能 | `chrome://extensions/` → ClipDesk の「Service Worker」→ Console |
+| ローカルブリッジ | `logs/obsidian-bridge.log` |
+
+拡張機能 Service Worker 内では、最大 200 件の直近ログがメモリに保持されています。
+
+### 9. クリップを投稿する
 
 1. クリップしたいページを開く
 2. 拡張機能アイコンをクリック
 3. 「クリップを作成」ボタンを押す
 4. ClipDesk サイトにページ情報が投稿され、サイト側の設定に応じて要約が行われる
 
-### 9. サイトで整理する
+### 10. サイトで整理する
 
 - 左サイドバーからカテゴリを選択してフィルタリング
 - クリップカードをドラッグ＆ドロップでサイドバーのカテゴリに分類
 - 星アイコンでピン留め
 - カード下部の「コメントを追加…」からメモを追加
+- クリップカードの「Obsidian に書き出し」ボタンから Obsidian へ書き出し（Obsidian 連携設定時）
+- Obsidian 連携が動作しない場合は、Web アプリ・Chrome 拡張機能 Service Worker・`logs/obsidian-bridge.log` の各ログを確認する
 
 ## トラブルシューティング
 

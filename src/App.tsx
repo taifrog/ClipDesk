@@ -938,8 +938,11 @@ function App() {
   // 成功したら obsidianPending を false にし、obsidianExportedAt を更新する
   async function exportClipToObsidian(clip: Clip, categoryName?: string): Promise<ObsidianExportResult> {
     if (!isChromeExtensionAvailable()) {
+      console.error('[ClipDesk Web] Chrome 拡張機能が見つかりません')
       return { ok: false, error: 'Chrome 拡張機能が見つかりません。拡張機能をインストール・有効化してください。' }
     }
+
+    console.log('[ClipDesk Web] Obsidian 書き出し メッセージ送信開始', { clipId: clip.id, categoryName })
 
     const payload: ObsidianExportRequest = {
       clip: {
@@ -967,9 +970,11 @@ function App() {
         { type: 'EXPORT_TO_OBSIDIAN', payload },
         (result: ObsidianExportResult | undefined) => {
           if (chrome.runtime.lastError) {
+            console.error('[ClipDesk Web] 拡張機能からエラー応答', chrome.runtime.lastError)
             resolve({ ok: false, error: chrome.runtime.lastError.message || '拡張機能との通信に失敗しました' })
             return
           }
+          console.log('[ClipDesk Web] 拡張機能から応答を受信', result)
           resolve(result || { ok: false, error: '拡張機能からの応答が空です' })
         },
       )

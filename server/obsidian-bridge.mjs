@@ -4,20 +4,60 @@
 
 import express from 'express';
 import cors from 'cors';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.OBSIDIAN_BRIDGE_PORT || 3002;
 const OBSIDIAN_BASE_URL = process.env.OBSIDIAN_BASE_URL || 'http://127.0.0.1:27123';
+const LOG_DIR = path.join(__dirname, '..', 'logs');
+const LOG_FILE = path.join(LOG_DIR, 'obsidian-bridge.log');
+
+// ログディレクトリがなければ作成する
+if (!fs.existsSync(LOG_DIR)) {
+  fs.mkdirSync(LOG_DIR, { recursive: true });
+}
 
 // JSON ボディと CORS を有効化
 app.use(express.json());
 app.use(cors({ origin: '*' }));
 
+// 日時文字列を取得する
+function getTimestamp() {
+  return new Date().toISOString();
+}
+
+// ファイルとコンソールの両方にログを出力する
+// @param level ログレベル（INFO / ERROR）
+// @param label ログのラベル
+// @param data 出力するデータ
+function writeLog(level, label, data) {
+  const timestamp = getTimestamp();
+  const line = `[${timestamp}] [${level}] [ClipDesk Obsidian Bridge] ${label}: ${typeof data === 'string' ? data : JSON.stringify(data)}`;
+  console.log(line);
+  try {
+    fs.appendFileSync(LOG_FILE, line + '\n');
+  } catch (err) {
+    console.error(`[${timestamp}] [ERROR] ログファイル書き込み失敗: ${err.message}`);
+  }
+}
+
 // デバッグ用ログ出力
 // @param label ログのラベル
 // @param data 出力するデータ
 function debugLog(label, data) {
-  console.log(`[ClipDesk Obsidian Bridge] ${label}:`, data);
+  writeLog('INFO', label, data);
+}
+
+// エラーログ出力
+// @param label ログのラベル
+// @param data 出力するデータ（エラー内容）
+function errorLog(label, data) {
+  writeLog('ERROR', label, data);
 }
 
 // ファイル名に使用できない文字をサニタイズする
@@ -85,9 +125,16 @@ async function callObsidianApi(apiKey, path, method = 'GET', body) {
   return response;
 }
 
+// 全リクエストの共通ログを出力するミドルウェア
+app.use((req, _res, next) => {
+  debugLog('リクエスト受信', { method: req.method, path: req.path, origin: req.headers.origin });
+  next();
+});
+
 // ヘルスチェックエンドポイント
 // ローカルサーバーが起動しているかを確認する
 app.get('/health', (_req, res) => {
+  debugLog('ヘルスチェック', 'ok');
   res.json({ ok: true, service: 'clipdesk-obsidian-bridge' });
 });
 
@@ -95,24 +142,31 @@ app.get('/health', (_req, res) => {
 // 実際に API キーで ping 的なアクセスを行う
 app.post('/validate', async (req, res) => {
   const { apiKey } = req.body || {};
+  debugLog('接続テスト受信', { hasApiKey: !!apiKey });
   if (!apiKey) {
+    errorLog('接続テスト失敗', 'apiKey が必要です');
     return res.status(400).json({ ok: false, error: 'apiKey が必要です' });
   }
   try {
     // 空のフォルダパスで接続テスト（存在しない場合は 404 だが認証は検証できる）
     const response = await callObsidianApi(apiKey, '/vault/', 'GET');
+    debugLog('接続テスト Obsidian 応答', { status: response.status });
     if (response.status === 401 || response.status === 403) {
+      errorLog('接続テスト失敗', 'Obsidian API キーが無効です');
       return res.status(401).json({ ok: false, error: 'Obsidian API キーが無効です' });
     }
     // 200 または 404 なら接続自体は成功
     const ok = response.status === 200 || response.status === 404;
+    if (!ok) {
+      errorLog('接続テスト失敗', `Obsidian Local REST API が予期しない応答を返しました: ${response.status}`);
+    }
     return res.status(ok ? 200 : 502).json({
       ok,
       status: response.status,
       error: ok ? undefined : `Obsidian Local REST API が予期しない応答を返しました: ${response.status}`,
     });
   } catch (err) {
-    debugLog('Obsidian 接続テスト失敗', err.message);
+    errorLog('Obsidian 接続テスト失敗', err.message);
     return res.status(502).json({ ok: false, error: `Obsidian Local REST API に接続できません: ${err.message}` });
   }
 });
@@ -120,10 +174,13 @@ app.post('/validate', async (req, res) => {
 // クリップを Obsidian に書き出す
 app.post('/export', async (req, res) => {
   const { clip, settings, categoryName } = req.body || {};
+  debugLog('書き出しリクエスト受信', { hasClip: !!clip, hasSettings: !!settings, categoryName });
   if (!clip || !settings) {
+    errorLog('書き出し失敗', 'clip と settings は必須です');
     return res.status(400).json({ ok: false, error: 'clip と settings は必須です' });
   }
   if (!settings.apiKey) {
+    errorLog('書き出し失敗', 'Obsidian API キーが設定されていません');
     return res.status(400).json({ ok: false, error: 'Obsidian API キーが設定されていません' });
   }
 
@@ -146,7 +203,7 @@ app.post('/export', async (req, res) => {
 
     if (!response.ok) {
       const text = await response.text().catch(() => '');
-      debugLog('Obsidian 書き出し失敗', { status: response.status, text });
+      errorLog('Obsidian 書き出し失敗', { status: response.status, text });
       return res.status(502).json({
         ok: false,
         error: `Obsidian への書き出しに失敗しました: ${response.status} ${text}`,
@@ -156,12 +213,18 @@ app.post('/export', async (req, res) => {
     debugLog('Obsidian 書き出し成功', fullPath);
     return res.json({ ok: true, path: fullPath });
   } catch (err) {
-    debugLog('Obsidian 書き出し例外', err.message);
+    errorLog('Obsidian 書き出し例外', err.message);
     return res.status(502).json({ ok: false, error: `Obsidian への書き出し中にエラーが発生しました: ${err.message}` });
   }
 });
 
+// 予期しないエラーをキャッチしてログに残す
+app.use((err, _req, _res, next) => {
+  errorLog('サーバー未処理エラー', err.stack || err.message || String(err));
+  next(err);
+});
+
 app.listen(PORT, () => {
-  console.log(`[ClipDesk Obsidian Bridge] http://127.0.0.1:${PORT} で起動しました`);
-  console.log(`[ClipDesk Obsidian Bridge] ターゲット Obsidian: ${OBSIDIAN_BASE_URL}`);
+  debugLog('起動', `http://127.0.0.1:${PORT}`);
+  debugLog('ターゲット Obsidian', OBSIDIAN_BASE_URL);
 });
