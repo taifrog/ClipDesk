@@ -609,22 +609,7 @@ function App() {
   // categoryId が 'trash' の場合はゴミ箱へ移動する
   const handleChangeCategory = async (clipId: number, categoryId: string) => {
     if (categoryId === 'trash') {
-      try {
-        const response = await fetch(`${FUNCTIONS_BASE}/clips/${clipId}/trash`, {
-          method: 'PATCH',
-          headers: getAuthHeaders(false),
-        })
-        if (!response.ok) {
-          throw new Error('ゴミ箱への移動に失敗しました')
-        }
-        const movedClip = clips.find((c) => c.id === clipId)
-        if (movedClip) {
-          setClips((prev) => prev.filter((clip) => clip.id !== clipId))
-          setTrashClips((prev) => [{ ...movedClip, deletedAt: new Date().toISOString() }, ...prev])
-        }
-      } catch (err) {
-        console.error('ゴミ箱移動失敗:', err)
-      }
+      await moveClipToTrash(clipId)
       return
     }
 
@@ -693,29 +678,35 @@ function App() {
 
     if (categoryId === 'trash') {
       // ゴミ箱へ移動
-      try {
-        const response = await fetch(`${FUNCTIONS_BASE}/clips/${draggingClipId}/trash`, {
-          method: 'PATCH',
-          headers: getAuthHeaders(false),
-        })
-        if (!response.ok) {
-          throw new Error('ゴミ箱への移動に失敗しました')
-        }
-        const movedClip = clips.find((c) => c.id === draggingClipId)
-        if (movedClip) {
-          setClips((prev) => prev.filter((clip) => clip.id !== draggingClipId))
-          setTrashClips((prev) => [{ ...movedClip, deletedAt: new Date().toISOString() }, ...prev])
-        }
-        setDraggingClipId(null)
-      } catch (err) {
-        console.error('ゴミ箱移動失敗:', err)
-      }
+      await moveClipToTrash(draggingClipId)
+      setDraggingClipId(null)
       return
     }
 
     const success = await updateClip(draggingClipId, { categoryId })
     if (success) {
       setDraggingClipId(null)
+    }
+  }
+
+  // クリップをゴミ箱へ移動する
+  // 成功したらローカル状態から通常クリップを除去し、ゴミ箱に追加する
+  const moveClipToTrash = async (clipId: number) => {
+    try {
+      const response = await fetch(`${FUNCTIONS_BASE}/clips/${clipId}/trash`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(false),
+      })
+      if (!response.ok) {
+        throw new Error('ゴミ箱への移動に失敗しました')
+      }
+      const movedClip = clips.find((c) => c.id === clipId) || trashClips.find((c) => c.id === clipId)
+      if (movedClip) {
+        setClips((prev) => prev.filter((clip) => clip.id !== clipId))
+        setTrashClips((prev) => [{ ...movedClip, deletedAt: new Date().toISOString() }, ...prev.filter((clip) => clip.id !== clipId)])
+      }
+    } catch (err) {
+      console.error('ゴミ箱移動失敗:', err)
     }
   }
 
@@ -1031,6 +1022,8 @@ function App() {
     setClips((prev) =>
       prev.map((c) => (c.id === clip.id ? { ...c, obsidianPending: false, obsidianExportedAt: new Date().toISOString() } : c)),
     )
+    // 元のクリップをゴミ箱へ移動する
+    await moveClipToTrash(clip.id)
     window.alert(`Obsidian に書き出しました:\n${result.path}`)
   }
 
@@ -1077,11 +1070,41 @@ function App() {
       }),
     )
 
+    // 書き出し成功したクリップをゴミ箱へ移動する
+    for (const { clip } of succeeded) {
+      await moveClipToTrash(clip.id)
+    }
+
     if (failed.length === 0) {
       window.alert(`${succeeded.length}件のクリップを Obsidian に書き出しました。`)
     } else {
       const messages = failed.map((r) => `・${r.clip.title}\n  ${r.result.error}`).join('\n')
       window.alert(`${succeeded.length}件の書き出しに成功しました。\n${failed.length}件が失敗しました:\n${messages}`)
+    }
+  }
+
+  // ゴミ箱を空にする
+  // ゴミ箱内のすべてのクリップを完全削除する
+  const handleEmptyTrash = async () => {
+    if (trashClips.length === 0) return
+
+    const confirmed = window.confirm(
+      `ゴミ箱内のクリップ ${trashClips.length}件を完全に削除しますか？この操作は元に戻せません。`,
+    )
+    if (!confirmed) return
+
+    try {
+      await Promise.all(
+        trashClips.map((clip) =>
+          fetch(`${FUNCTIONS_BASE}/clips/${clip.id}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(false),
+          }),
+        ),
+      )
+      setTrashClips([])
+    } catch (err) {
+      console.error('ゴミ箱の削除に失敗しました:', err)
     }
   }
 
@@ -1403,6 +1426,7 @@ function App() {
                   onExportToObsidian={handleExportToObsidian}
                   onRestore={handleRestoreClip}
                   onChangeCategory={handleChangeCategory}
+                  onEmptyTrash={selectedCategoryId === 'trash' ? handleEmptyTrash : undefined}
                 />
               )}
             </>

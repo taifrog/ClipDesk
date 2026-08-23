@@ -22,6 +22,7 @@ interface ClipGridProps {
   onExportToObsidian?: (clip: Clip) => void
   onRestore?: (id: number) => void
   onChangeCategory?: (id: number, categoryId: string) => void
+  onEmptyTrash?: () => void
 }
 
 // カテゴリIDからカテゴリ情報を取得する
@@ -49,6 +50,7 @@ export function ClipGrid({
   onExportToObsidian,
   onRestore,
   onChangeCategory,
+  onEmptyTrash,
 }: ClipGridProps) {
   if (clips.length === 0) {
     return null
@@ -96,9 +98,20 @@ export function ClipGrid({
         ))}
       </div>
 
-      {/* ゴミ箱表示時は自動削除の注釈を表示する */}
+      {/* ゴミ箱表示時は一括削除ボタンと自動削除の注釈を表示する */}
       {isTrash && (
-        <p className="trash-notice">ゴミ箱に入れてから1週間経過したクリップは自動的に削除されます。</p>
+        <div className="trash-actions">
+          <button
+            type="button"
+            className="button-danger empty-trash-button"
+            onClick={onEmptyTrash}
+            disabled={!onEmptyTrash}
+            aria-label="ゴミ箱を空にする"
+          >
+            ゴミ箱を空にする
+          </button>
+          <p className="trash-notice">ゴミ箱に入れてから1週間経過したクリップは自動的に削除されます。</p>
+        </div>
       )}
 
       {/* ページネーション */}
