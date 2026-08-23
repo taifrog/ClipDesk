@@ -72,6 +72,15 @@ function sanitizeFileName(name) {
     .slice(0, 200);
 }
 
+// Obsidian Local REST API 用にパスを URL エンコードする
+// / はパス区切りとして保持し、各フォルダ名・ファイル名のみをエンコードする
+// これにより、日本語タイトルやスペースを含むファイル名でも正しくアクセスできる
+// @param fullPath Vault ルートからの相対パス（例: ClipDesk/タイトル.md）
+// @returns URL エンコード済みのパス
+function encodeObsidianPath(fullPath) {
+  return fullPath.split('/').map(encodeURIComponent).join('/');
+}
+
 // テンプレート文字列に変数を埋め込む
 // @param template テンプレート文字列
 // @param variables 埋め込む変数のマップ
@@ -194,9 +203,10 @@ app.post('/export', async (req, res) => {
 
   try {
     // Obsidian Local REST API は /vault/{path} に PUT でファイル作成/更新を行う
+    // パス区切りの / はそのままにし、各セグメントだけをエンコードする
     const response = await callObsidianApi(
       settings.apiKey,
-      `/vault/${encodeURIComponent(fullPath)}`,
+      `/vault/${encodeObsidianPath(fullPath)}`,
       'PUT',
       noteBody,
     );
