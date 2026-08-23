@@ -530,22 +530,19 @@
   gap: 16px;
 }
 
-.clip-grid-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-h);
-  margin: 0;
-}
-
-/* ゴミ箱表示時のアクションボタンと注釈 */
-.trash-actions {
+.clip-grid-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
+}
+
+.clip-grid-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0;
 }
 
 .empty-trash-button {
@@ -566,7 +563,7 @@
 }
 
 @media (max-width: 768px) {
-  .trash-actions {
+  .clip-grid-header {
     flex-direction: column;
     align-items: flex-start;
   }

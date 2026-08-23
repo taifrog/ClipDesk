@@ -74,7 +74,21 @@ export function ClipGrid({
 
   return (
     <section className="clip-grid-section">
-      <h3 className="clip-grid-title">{title}</h3>
+      <div className="clip-grid-header">
+        <h3 className="clip-grid-title">{title}</h3>
+        {/* ゴミ箱表示時はヘッダー右側に一括削除ボタンを配置する */}
+        {isTrash && (
+          <button
+            type="button"
+            className="button-danger empty-trash-button"
+            onClick={onEmptyTrash}
+            disabled={!onEmptyTrash}
+            aria-label="ゴミ箱を空にする"
+          >
+            ゴミ箱を空にする
+          </button>
+        )}
+      </div>
       <div className={`clip-grid ${viewMode === 'list' ? 'clip-grid-list' : ''}`}>
         {clips.map((clip) => (
           <ClipCard
@@ -98,20 +112,9 @@ export function ClipGrid({
         ))}
       </div>
 
-      {/* ゴミ箱表示時は一括削除ボタンと自動削除の注釈を表示する */}
+      {/* ゴミ箱表示時は自動削除の注釈を表示する */}
       {isTrash && (
-        <div className="trash-actions">
-          <button
-            type="button"
-            className="button-danger empty-trash-button"
-            onClick={onEmptyTrash}
-            disabled={!onEmptyTrash}
-            aria-label="ゴミ箱を空にする"
-          >
-            ゴミ箱を空にする
-          </button>
-          <p className="trash-notice">ゴミ箱に入れてから1週間経過したクリップは自動的に削除されます。</p>
-        </div>
+        <p className="trash-notice">ゴミ箱に入れてから1週間経過したクリップは自動的に削除されます。</p>
       )}
 
       {/* ページネーション */}
