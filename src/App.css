@@ -1907,6 +1907,26 @@
   color: #991b1b;
 }
 
+/* 共有受信ページ下部のメイン画面遷移リンク */
+.share-target-main-link {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.share-target-main-link a {
+  display: inline-block;
+  text-decoration: none;
+}
+
+@media (max-width: 768px) {
+  .share-target-main-link a {
+    width: 100%;
+    padding: 12px 18px;
+    font-size: 16px;
+    box-sizing: border-box;
+  }
+}
+
 /* 診断情報表示（要約/日付/場所の取得状況確認用） */
 .diagnostics-details {
   margin-top: 8px;

@@ -303,6 +303,12 @@ export default function ShareTargetPage() {
     setSharedData((prev) => ({ ...prev, url: value }))
   }
 
+  // メイン画面へのURL（Viteのbaseパスを考慮）
+  const mainPageUrl = useMemo(() => {
+    const base = (import.meta.env.BASE_URL as string | undefined) || '/'
+    return `${window.location.origin}${base.replace(/\/$/, '')}/`
+  }, [])
+
   return (
     <div className="share-target-page">
       <header className="share-target-header">
@@ -313,7 +319,8 @@ export default function ShareTargetPage() {
         {isAuthLoading ? (
           <p className="empty-message">読み込み中…</p>
         ) : (
-          <form className="share-target-form" onSubmit={handleSubmit}>
+          <>
+            <form className="share-target-form" onSubmit={handleSubmit}>
             <div className="form-group">
               <label htmlFor="share-title">タイトル</label>
               <input
@@ -449,6 +456,16 @@ export default function ShareTargetPage() {
               </p>
             )}
           </form>
+
+          <div className="share-target-main-link">
+            <a
+              href={mainPageUrl}
+              className="button-secondary"
+            >
+              ClipDesk メイン画面を表示
+            </a>
+          </div>
+          </>
         )}
       </main>
     </div>
