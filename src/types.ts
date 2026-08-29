@@ -58,7 +58,7 @@ export type SortMode = 'newest' | 'oldest' | 'category'
 export type ViewMode = 'grid' | 'list'
 
 // サイト側（Webアプリ）のAI要約設定を表す型
-// SQLite の app_settings テーブルに永続化される
+// Supabase の app_settings テーブルに永続化される（user_id 単位のレコード）
 export interface AiSummarySettings {
   // AI要約機能の有効/無効
   enabled: boolean

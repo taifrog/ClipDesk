@@ -60,6 +60,8 @@ db.exec(`
     createdAt TEXT NOT NULL
   );
 
+  -- [非推奨・サービス全体共有] 旧 SQLite 用アプリ設定テーブル
+  -- 現行の Supabase 版では app_settings は user_id 単位のレコードとして管理されている
   CREATE TABLE IF NOT EXISTS app_settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
