@@ -87,6 +87,27 @@ const DEFAULT_NOTION_SETTINGS: NotionSettings = {
   summaryPropertyName: 'Summary',
 }
 
+// Notion のデータベース URL / ID から 32 文字の ID 部分を抽出する
+// 例：
+//   https://www.notion.so/Calendar-Name-15c8a4d4a4e442a591d26685d5d50bd5
+//   https://www.notion.so/myworkspace/15c8a4d4-a4e4-42a5-91d2-6685d5d50bd5?v=...
+//   15c8a4d4a4e442a591d26685d5d50bd5?v=...
+// いずれも 15c8a4d4a4e442a591d26685d5d50bd5 に正規化する
+function extractNotionDatabaseId(input: string): string {
+  const cleaned = input.trim()
+  // クエリ文字列を除去する
+  const withoutQuery = cleaned.split('?')[0]
+  // ハイフンを除去して英数字のみにする
+  const normalized = withoutQuery.replace(/-/g, '')
+  // 末尾にある 32 文字の英数字を ID として抽出する
+  const match = normalized.match(/([0-9a-f]{32})$/i)
+  if (match) {
+    return match[1]
+  }
+  // 32 文字の ID が見つからない場合は、少なくとも ?v=... を取り除いた値を返す
+  return withoutQuery
+}
+
 // 設定ダイアログ
 // クリップ収集元サイト（タグ・サイトURL）の登録・削除と、AI要約設定、Obsidian 連携設定、API キー管理を行う
 export function SettingsDialog({
@@ -521,7 +542,7 @@ export function SettingsDialog({
     try {
       await onSaveNotionSettings({
         apiKey: localNotionSettings.apiKey.trim(),
-        databaseId: localNotionSettings.databaseId.trim(),
+        databaseId: extractNotionDatabaseId(localNotionSettings.databaseId),
         datePropertyName: localNotionSettings.datePropertyName.trim() || DEFAULT_NOTION_SETTINGS.datePropertyName,
         titlePropertyName: localNotionSettings.titlePropertyName.trim() || DEFAULT_NOTION_SETTINGS.titlePropertyName,
         urlPropertyName: localNotionSettings.urlPropertyName.trim() || DEFAULT_NOTION_SETTINGS.urlPropertyName,
@@ -731,7 +752,7 @@ export function SettingsDialog({
             </div>
 
             <div className="form-group">
-              <label htmlFor="notion-database-id">Notion データベース ID</label>
+              <label htmlFor="notion-database-id">Notion データベース ID（URL のまま貼り付け可）</label>
               <input
                 id="notion-database-id"
                 type="text"

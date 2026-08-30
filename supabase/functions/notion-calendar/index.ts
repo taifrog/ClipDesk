@@ -61,6 +61,12 @@ async function createNotionPage(
   clip: ClipRow,
   settings: NotionSettings,
 ): Promise<{ pageId: string; pageUrl: string }> {
+  // URL に含まれる ?v=... やハイフンを除去して、32 文字のデータベース ID のみを使用する
+  const databaseId = settings.databaseId
+    .split('?')[0]
+    .replace(/-/g, '')
+    .match(/([0-9a-f]{32})$/i)?.[1] ?? settings.databaseId.split('?')[0];
+
   const response = await fetch('https://api.notion.com/v1/pages', {
     method: 'POST',
     headers: {
@@ -69,7 +75,7 @@ async function createNotionPage(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      parent: { database_id: settings.databaseId },
+      parent: { database_id: databaseId },
       properties: buildNotionProperties(clip, settings),
     }),
   });

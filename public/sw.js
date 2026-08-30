@@ -1,7 +1,7 @@
 // ClipDesk PWA 用 Service Worker
 // Web Share Target からの POST リクエストを受け取り、React アプリ内の /share ページへ渡す
 
-const CACHE_NAME = 'clipdesk-v1';
+const CACHE_NAME = 'clipdesk-v2';
 
 // インストール時に必要な静的アセットをキャッシュする
 self.addEventListener('install', (event) => {
@@ -83,7 +83,10 @@ self.addEventListener('fetch', (event) => {
   // その他のリクエストはネットワーク優先で処理する
   event.respondWith(
     fetch(event.request).catch(() => {
-      return caches.match(event.request);
+      return caches.match(event.request).then((cached) => {
+        // キャッシュにない場合は Service Worker エラーを防ぐためのシンプルなレスポンスを返す
+        return cached ?? new Response('Network error', { status: 503 });
+      });
     })
   );
 });
