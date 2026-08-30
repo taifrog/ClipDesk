@@ -1,7 +1,7 @@
 // アプリ設定取得用ヘルパー
 
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.49.0';
-import { AiSummarySettings, ExtensionSettings, ObsidianSettings } from './ai.ts';
+import { AiSummarySettings, ExtensionSettings, NotionSettings, ObsidianSettings } from './ai.ts';
 
 // デバッグメッセージ出力用関数
 // @param msg 出力する文字列
@@ -53,11 +53,22 @@ const DEFAULT_EXTENSION_SETTINGS: ExtensionSettings = {
   extensionId: '',
 };
 
-// アプリ設定全体（AI 要約設定 + Obsidian 連携設定 + 拡張機能連携設定）
+// Notion カレンダー連携設定のデフォルト値
+const DEFAULT_NOTION_SETTINGS: NotionSettings = {
+  apiKey: '',
+  databaseId: '',
+  datePropertyName: 'Date',
+  titlePropertyName: 'Name',
+  urlPropertyName: 'URL',
+  summaryPropertyName: 'Summary',
+};
+
+// アプリ設定全体（AI 要約設定 + Obsidian 連携設定 + 拡張機能連携設定 + Notion カレンダー連携設定）
 export interface AppSettings {
   aiSummary: AiSummarySettings;
   obsidian: ObsidianSettings;
   extension: ExtensionSettings;
+  notion: NotionSettings;
 }
 
 // 指定ユーザーのアプリ設定全体を取得する
@@ -69,7 +80,7 @@ export async function getAppSettings(
   const { data, error } = await supabase
     .from('app_settings')
     .select(
-      'ai_summary_enabled, ai_summary_api_key, ai_summary_model, ai_summary_language, obsidian_api_key, obsidian_folder, obsidian_filename_template, obsidian_note_template, extension_id',
+      'ai_summary_enabled, ai_summary_api_key, ai_summary_model, ai_summary_language, obsidian_api_key, obsidian_folder, obsidian_filename_template, obsidian_note_template, extension_id, notion_api_key, notion_database_id, notion_date_property, notion_title_property, notion_url_property, notion_summary_property',
     )
     .eq('user_id', userId)
     .maybeSingle();
@@ -79,6 +90,7 @@ export async function getAppSettings(
       aiSummary: DEFAULT_AI_SUMMARY_SETTINGS,
       obsidian: DEFAULT_OBSIDIAN_SETTINGS,
       extension: DEFAULT_EXTENSION_SETTINGS,
+      notion: DEFAULT_NOTION_SETTINGS,
     };
   }
 
@@ -102,6 +114,14 @@ export async function getAppSettings(
     },
     extension: {
       extensionId: data.extension_id ?? DEFAULT_EXTENSION_SETTINGS.extensionId,
+    },
+    notion: {
+      apiKey: data.notion_api_key ?? DEFAULT_NOTION_SETTINGS.apiKey,
+      databaseId: data.notion_database_id ?? DEFAULT_NOTION_SETTINGS.databaseId,
+      datePropertyName: data.notion_date_property ?? DEFAULT_NOTION_SETTINGS.datePropertyName,
+      titlePropertyName: data.notion_title_property ?? DEFAULT_NOTION_SETTINGS.titlePropertyName,
+      urlPropertyName: data.notion_url_property ?? DEFAULT_NOTION_SETTINGS.urlPropertyName,
+      summaryPropertyName: data.notion_summary_property ?? DEFAULT_NOTION_SETTINGS.summaryPropertyName,
     },
   };
 }
@@ -165,4 +185,26 @@ export async function saveExtensionSettings(
   await supabase.from('app_settings').upsert(upsert, { onConflict: 'user_id' });
   const updated = await getAppSettings(supabase, userId);
   return updated.extension;
+}
+
+// 指定ユーザーの Notion カレンダー連携設定を保存する
+export async function saveNotionSettings(
+  supabase: SupabaseClient,
+  userId: string,
+  settings: Partial<NotionSettings>,
+): Promise<NotionSettings> {
+  const upsert: Record<string, unknown> = {
+    user_id: userId,
+  };
+  if (typeof settings.apiKey === 'string') upsert.notion_api_key = settings.apiKey;
+  if (typeof settings.databaseId === 'string') upsert.notion_database_id = settings.databaseId;
+  if (typeof settings.datePropertyName === 'string') upsert.notion_date_property = settings.datePropertyName;
+  if (typeof settings.titlePropertyName === 'string') upsert.notion_title_property = settings.titlePropertyName;
+  if (typeof settings.urlPropertyName === 'string') upsert.notion_url_property = settings.urlPropertyName;
+  if (typeof settings.summaryPropertyName === 'string') upsert.notion_summary_property = settings.summaryPropertyName;
+
+  debug(`saveNotionSettings upsert: apiKey=${typeof upsert.notion_api_key === 'string' ? '(set)' : '(not set)'}, databaseId=${typeof upsert.notion_database_id === 'string' ? '(set)' : '(not set)'}`);
+  await supabase.from('app_settings').upsert(upsert, { onConflict: 'user_id' });
+  const updated = await getAppSettings(supabase, userId);
+  return updated.notion;
 }

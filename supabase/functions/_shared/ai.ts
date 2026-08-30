@@ -24,6 +24,23 @@ export interface ObsidianSettings {
   noteTemplate: string;
 }
 
+// Notion カレンダー連携設定を表す型
+// Notion データベースへクリップのイベント情報を登録するための設定
+export interface NotionSettings {
+  // Notion Integration Token（secret_...）
+  apiKey: string;
+  // 登録先の Notion データベース ID
+  databaseId: string;
+  // 日付情報を格納するプロパティ名
+  datePropertyName: string;
+  // タイトルを格納するプロパティ名
+  titlePropertyName: string;
+  // URL を格納するプロパティ名
+  urlPropertyName: string;
+  // 要約を格納するプロパティ名
+  summaryPropertyName: string;
+}
+
 // Chrome 拡張機能連携設定を表す型
 // Web アプリから拡張機能へ sendMessage する際の拡張機能 ID を保持する
 export interface ExtensionSettings {

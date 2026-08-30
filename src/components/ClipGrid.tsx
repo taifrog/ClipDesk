@@ -20,6 +20,7 @@ interface ClipGridProps {
   onUpdateEventInfo?: (id: number, eventInfo: { eventStartDate?: string | null; eventEndDate?: string | null; location?: string | null }) => void
   onToggleObsidianPending?: (id: number) => void
   onExportToObsidian?: (clip: Clip) => void
+  onExportToNotion?: (clip: Clip) => void
   onRestore?: (id: number) => void
   onChangeCategory?: (id: number, categoryId: string) => void
   onEmptyTrash?: () => void
@@ -48,6 +49,7 @@ export function ClipGrid({
   onUpdateEventInfo,
   onToggleObsidianPending,
   onExportToObsidian,
+  onExportToNotion,
   onRestore,
   onChangeCategory,
   onEmptyTrash,
@@ -106,6 +108,7 @@ export function ClipGrid({
             onUpdateEventInfo={onUpdateEventInfo}
             onToggleObsidianPending={onToggleObsidianPending}
             onExportToObsidian={onExportToObsidian}
+            onExportToNotion={onExportToNotion}
             onRestore={onRestore}
             onChangeCategory={onChangeCategory}
           />

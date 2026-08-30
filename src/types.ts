@@ -31,6 +31,14 @@ export interface Clip {
   obsidianPending?: boolean
   // Obsidian へ実際に書き出された日時（null の場合は未書き出し）
   obsidianExportedAt?: string | null
+  // Notion カレンダー連携済みフラグ
+  notionExported?: boolean
+  // Notion 登録完了日時（null の場合は未登録）
+  notionExportedAt?: string | null
+  // Notion ページ ID（null の場合は未登録）
+  notionPageId?: string | null
+  // Notion ページ URL（null の場合は未登録）
+  notionPageUrl?: string | null
 }
 
 // カテゴリ1件を表す型
@@ -81,6 +89,23 @@ export interface ObsidianSettings {
   filenameTemplate: string
   // Obsidian ノートの本文テンプレート
   noteTemplate: string
+}
+
+// Notion カレンダー連携設定を表す型
+// Notion データベースへクリップのイベント情報を登録するための設定
+export interface NotionSettings {
+  // Notion Integration Token（secret_...）
+  apiKey: string
+  // 登録先の Notion データベース ID
+  databaseId: string
+  // 日付情報を格納するプロパティ名
+  datePropertyName: string
+  // タイトルを格納するプロパティ名
+  titlePropertyName: string
+  // URL を格納するプロパティ名
+  urlPropertyName: string
+  // 要約を格納するプロパティ名
+  summaryPropertyName: string
 }
 
 // Chrome 拡張機能連携設定を表す型

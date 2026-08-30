@@ -2,7 +2,7 @@
 
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { getServiceClient, getUserClient, getJwt } from '../_shared/supabase.ts';
-import { getAppSettings, saveAiSummarySettings, saveObsidianSettings, saveExtensionSettings } from '../_shared/settings.ts';
+import { getAppSettings, saveAiSummarySettings, saveExtensionSettings, saveNotionSettings, saveObsidianSettings } from '../_shared/settings.ts';
 
 // デバッグメッセージ出力用関数
 // @param msg 出力する文字列
@@ -103,6 +103,28 @@ Deno.serve(async (req) => {
         extensionId: body.extensionId,
       });
       return new Response(JSON.stringify({ ok: true, settings: extensionSettings }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Notion カレンダー連携設定の保存
+    if (
+      typeof body.notionApiKey === 'string' ||
+      typeof body.notionDatabaseId === 'string' ||
+      typeof body.notionDatePropertyName === 'string' ||
+      typeof body.notionTitlePropertyName === 'string' ||
+      typeof body.notionUrlPropertyName === 'string' ||
+      typeof body.notionSummaryPropertyName === 'string'
+    ) {
+      const notionSettings = await saveNotionSettings(supabase, userId, {
+        apiKey: typeof body.notionApiKey === 'string' ? body.notionApiKey : undefined,
+        databaseId: typeof body.notionDatabaseId === 'string' ? body.notionDatabaseId : undefined,
+        datePropertyName: typeof body.notionDatePropertyName === 'string' ? body.notionDatePropertyName : undefined,
+        titlePropertyName: typeof body.notionTitlePropertyName === 'string' ? body.notionTitlePropertyName : undefined,
+        urlPropertyName: typeof body.notionUrlPropertyName === 'string' ? body.notionUrlPropertyName : undefined,
+        summaryPropertyName: typeof body.notionSummaryPropertyName === 'string' ? body.notionSummaryPropertyName : undefined,
+      });
+      return new Response(JSON.stringify({ ok: true, settings: notionSettings }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

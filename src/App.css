@@ -866,6 +866,40 @@
   align-self: center;
 }
 
+/* クリップカードの Notion カレンダー登録ボタン */
+.clip-card-notion {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.clip-card-notion:hover {
+  background: var(--accent-bg);
+}
+
+.clip-card-notion:hover .notion-icon {
+  fill: var(--accent);
+}
+
+.notion-icon {
+  width: 18px;
+  height: 18px;
+  fill: var(--text);
+  transition: fill 0.2s;
+  opacity: 0.7;
+}
+
+.clip-card-list .clip-card-notion {
+  align-self: center;
+}
+
 .check-icon {
   width: 18px;
   height: 18px;
