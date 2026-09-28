@@ -11,10 +11,11 @@ function debug(msg: string) {
 }
 
 // AI要約設定のデフォルト値
+// 2026-09のGo必須ヘッダ化以降は gpt-4o-mini 非対応。コスパ優先で glm-5.3-flash（入力$0.15/出力$0.50, 月$60枠）を既定にする
 const DEFAULT_AI_SUMMARY_SETTINGS: AiSummarySettings = {
   enabled: true,
   apiKey: '',
-  model: 'gpt-4o-mini',
+  model: 'glm-5.3-flash',
   language: 'ja',
 };
 

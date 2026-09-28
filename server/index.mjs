@@ -132,12 +132,23 @@ function getAppSettings() {
   const defaults = {
     aiSummaryEnabled: 'true',
     aiSummaryApiKey: '',
-    aiSummaryModel: 'gpt-4o-mini',
+    aiSummaryModel: 'glm-5.3-flash',
     aiSummaryLanguage: 'ja',
   };
 
   // 利用できなくなったモデル名が保存されている場合はデフォルトに戻す
+  // Go必須ヘッダ化以降は旧OpenAI/Claude/Gemini直名は非対応。glm-5.3-flash / deepseek-v4-flash を既定に
   const supportedModels = new Set([
+    'glm-5.3-flash',
+    'glm-5.3',
+    'glm-5.2',
+    'glm-5.1',
+    'deepseek-v4-flash',
+    'deepseek-flash',
+    'deepseek-v4.1-flash',
+    'kimi-k3',
+    'kimi-k2.7-code',
+    'kimi-k2.6',
     'gpt-4o-mini',
     'gpt-4o',
     'gpt-3.5-turbo',
@@ -188,8 +199,9 @@ function truncateText(text, maxChars) {
 // @param text 要約対象の本文
 // @param title Webページのタイトル
 // @param settings AI要約設定（enabled, apiKey, model, language）
+// @param sessionId OpenCode Go ルーティング用セッションID（x-opencode-session）。2025-09-06以降必須化
 // @returns 要約文字列
-async function summarizeWithOpenCodeGo(text, title, settings) {
+async function summarizeWithOpenCodeGo(text, title, settings, sessionId) {
   if (!settings.apiKey) {
     throw new Error('OpenCode Go APIキーが設定されていません');
   }
@@ -203,11 +215,14 @@ async function summarizeWithOpenCodeGo(text, title, settings) {
     title: title.slice(0, 100),
   });
 
+  const sessionHeader = (sessionId && String(sessionId).trim()) || `clipdesk-${Date.now()}`;
   const response = await fetch('https://opencode.ai/zen/go/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${settings.apiKey}`,
+      'User-Agent': 'ClipDesk/1.0 (+https://github.com/taifrog/ClipDesk)',
+      'x-opencode-session': sessionHeader,
     },
     body: JSON.stringify({
       model: settings.model,
@@ -428,7 +443,7 @@ app.post('/api/clip', async (req, res) => {
 
   if (!finalSummary && rawBody && aiSettings.enabled && aiSettings.apiKey) {
     try {
-      const aiSummary = await summarizeWithOpenCodeGo(rawBody, title, aiSettings);
+      const aiSummary = await summarizeWithOpenCodeGo(rawBody, title, aiSettings, `clip-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
       if (aiSummary) finalSummary = aiSummary;
     } catch (err) {
       aiSummaryError = err.message || '不明なエラー';
@@ -731,7 +746,7 @@ app.post('/api/collect', async (req, res) => {
       // AI要約が有効でAPIキーが設定されている場合、RSSの要約本文を使って要約を生成する
       if (aiSettings.enabled && aiSettings.apiKey && summary) {
         try {
-          const aiSummary = await summarizeWithOpenCodeGo(summary, article.title, aiSettings);
+          const aiSummary = await summarizeWithOpenCodeGo(summary, article.title, aiSettings, `collect-${article.url.slice(0, 32)}-${Date.now()}`);
           if (aiSummary) summary = aiSummary;
         } catch (err) {
           debugLog('AI要約失敗', `${article.url}: ${err.message}`);

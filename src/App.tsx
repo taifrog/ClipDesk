@@ -34,11 +34,11 @@ import { getSupabaseClient } from './lib/supabase'
 import type { AiSummarySettings, Category, Clip, ExtensionSettings, NotionSettings, ObsidianExportRequest, ObsidianExportResult, ObsidianSettings, SortMode, SourceSite, UserApiKey, ViewMode } from './types'
 import './App.css'
 
-// AI要約設定のデフォルト値
+// AI要約設定のデフォルト値（Go必須ヘッダ化以降は gpt-4o-mini 非対応。既定は glm-5.3-flash）
 const DEFAULT_AI_SUMMARY_SETTINGS: AiSummarySettings = {
   enabled: true,
   apiKey: '',
-  model: 'gpt-4o-mini',
+  model: 'glm-5.3-flash',
   language: 'ja',
 }
 

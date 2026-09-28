@@ -34,11 +34,11 @@ interface SettingsDialogProps {
 // 収集元サイト追加機能を一時的に非表示にするフラグ
 const HIDE_COLLECT_FEATURES = true
 
-// AI要約のデフォルト設定値
+// AI要約のデフォルト設定値（Go必須ヘッダ化以降は gpt-4o-mini 非対応。既定は glm-5.3-flash）
 const DEFAULT_AI_SUMMARY_SETTINGS: AiSummarySettings = {
   enabled: true,
   apiKey: '',
-  model: 'gpt-4o-mini',
+  model: 'glm-5.3-flash',
   language: 'ja',
 }
 
@@ -629,7 +629,7 @@ export function SettingsDialog({
                   type="text"
                   value={localAiSettings.model}
                   onChange={(e) => handleAiSettingsChange({ model: e.target.value })}
-                  placeholder="gpt-4o-mini"
+                  placeholder="glm-5.3-flash"
                   disabled={isSavingAiSettings}
                 />
               </div>

@@ -129,7 +129,8 @@ Deno.serve(async (req) => {
     // AI 要約を実行する
     if (aiInputText && aiSettings.enabled && aiSettings.apiKey) {
       debug(`enrich-clip: AI 要約実行: 入力=${aiInputText.length}文字, title=${title}`);
-      const aiResult = await summarizeWithOpenCodeGo(aiInputText, title, aiSettings);
+      const sessionId = `enrich-${userId}-${clipId}`;
+      const aiResult = await summarizeWithOpenCodeGo(aiInputText, title, aiSettings, sessionId);
       debug(`enrich-clip: AI 要約結果: summary=${aiResult.summary.length}, eventStartDate=${aiResult.eventStartDate}, eventEndDate=${aiResult.eventEndDate}, location=${aiResult.location}`);
       if (aiResult.summary) finalSummary = aiResult.summary;
       eventStartDate = aiResult.eventStartDate;

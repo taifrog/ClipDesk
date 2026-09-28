@@ -122,11 +122,13 @@ function extractJsonFromResponse(text: string): Record<string, unknown> | null {
 // @param text 要約対象の本文
 // @param title Webページのタイトル
 // @param settings AI要約設定
+// @param sessionId OpenCode Go ルーティング用セッションID（x-opencode-session）。2025-09-06以降必須化（https://opencode.ai/docs/go/#where-can-i-use-it）
 // @returns 要約文字列とイベント情報を含むオブジェクト
 export async function summarizeWithOpenCodeGo(
   text: string,
   title: string,
   settings: AiSummarySettings,
+  sessionId?: string,
 ): Promise<AiSummaryResult> {
   if (!settings.apiKey) {
     throw new Error('OpenCode Go APIキーが設定されていません');
@@ -157,12 +159,19 @@ export async function summarizeWithOpenCodeGo(
 
 本文:\n${bodyText}`;
 
+  // x-opencode-session は2025-09-06以降必須化。未送信だと 400 MissingSessionID になる（https://opencode.ai/docs/go/#where-can-i-use-it）
+  // sessionId は enrich-{userId}-{clipId} を推奨（同一クリップのリトライで同一＝プロンプトキャッシュ有効）
+  const sessionHeader = sessionId?.trim() || `clipdesk-${Date.now()}`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${settings.apiKey}`,
+    'User-Agent': 'ClipDesk/1.0 (+https://github.com/taifrog/ClipDesk)',
+    'x-opencode-session': sessionHeader,
+  };
+
   const response = await fetch('https://opencode.ai/zen/go/v1/chat/completions', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${settings.apiKey}`,
-    },
+    headers,
     body: JSON.stringify({
       model: settings.model,
       messages: [
