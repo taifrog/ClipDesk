@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "ClipDesk アーキテクチャ — 拡張クリップ投稿を主経路とする構成",
+    "quality_profile": "showcase",
+    "viewBox": [1200, 900],
+    "repository": {
+      "url": "https://github.com/taifrog/ClipDesk.git",
+      "revision": "9d33ab655f99402d1b13eed999ba594a4d622a39"
+    },
+    "views": [
+      { "id": "main-clip-path", "label": "主経路: 拡張クリップ投稿", "focus": ["ext", "edge_clip", "db", "edge_enrich", "opencode", "web", "edge_clips"], "note": "拡張が取得した本文をclipが保存しenrich-clipが非同期でAI要約してDBを更新、Webがポーリングで反映" },
+      { "id": "trust-boundaries", "label": "信頼境界と認証", "focus": ["auth", "edge_clip", "edge_clips", "bridge"], "note": "x-api-key / JWT / ServiceRole / Localhost の4境界を分離して確認" },
+      { "id": "external-integrations", "label": "外部連携", "focus": ["opencode", "notion", "obsidian", "bridge"], "note": "AI要約・Notion・Obsidian は補足カードに集約し主経路のエッジは増やさない" }
+    ]
+  },
+  "components": [
+    { "id": "ext", "type": "frontend", "label": "Chrome拡張 (MV3)", "sublabel": "popup / content / SW", "tag": "externally_connectable", "pos": [40, 120], "size": [155, 64], "sources": [{ "path": "addon-chrome/src/manifest.json", "line": 2 }] },
+    { "id": "web", "type": "frontend", "label": "ClipDesk Web", "sublabel": "React 19 + Vite", "tag": "Pages / :5173", "pos": [40, 320], "size": [155, 64], "sources": [{ "path": "src/App.tsx", "line": 93 }] },
+    { "id": "edge_clip", "type": "backend", "label": "Edge: clip", "sublabel": "POST /functions/v1/clip", "tag": "x-api-key OR JWT", "pos": [340, 120], "size": [170, 64], "sources": [{ "path": "supabase/functions/clip/index.ts", "line": 1 }] },
+    { "id": "edge_clips", "type": "backend", "label": "Edge: clips他", "sublabel": "GET/PATCH/DELETE", "tag": "JWT only", "pos": [340, 320], "size": [170, 64], "sources": [{ "path": "supabase/functions/clips/index.ts", "line": 1 }] },
+    { "id": "edge_enrich", "type": "backend", "label": "enrich-clip", "sublabel": "fire-and-forget", "tag": "pending→completed", "pos": [340, 530], "size": [170, 64], "sources": [{ "path": "supabase/functions/enrich-clip/index.ts", "line": 1 }] },
+    { "id": "db", "type": "database", "label": "Postgres + RLS", "sublabel": "clips / categories", "tag": "pg_cron 0 0 * * *", "pos": [680, 260], "size": [165, 64], "sources": [{ "path": "supabase/migrations/0001_initial_schema.sql", "line": 6 }] },
+    { "id": "auth", "type": "security", "label": "Supabase Auth", "sublabel": "JWT Bearer", "tag": "anon/authenticated", "pos": [680, 90], "size": [165, 64], "sources": [{ "path": "supabase/config.toml", "line": 155 }] },
+    { "id": "opencode", "type": "external", "label": "OpenCode AI", "sublabel": "zen/go v1/chat/completions", "tag": "gpt-4o-mini", "pos": [680, 530], "size": [165, 64], "sources": [{ "path": "supabase/functions/_shared/ai.ts", "line": 160 }] },
+    { "id": "bridge", "type": "backend", "label": "Obsidian Bridge", "sublabel": "localhost:3002", "tag": "CORS *", "pos": [40, 650], "size": [155, 64], "sources": [{ "path": "server/obsidian-bridge.mjs", "line": 15 }] },
+    { "id": "obsidian", "type": "external", "label": "Obsidian Vault", "sublabel": "Local REST :27123", "tag": "PUT /vault/{path}", "pos": [340, 650], "size": [170, 64], "sources": [{ "path": "server/obsidian-bridge.mjs", "line": 209 }] },
+    { "id": "notion", "type": "external", "label": "Notion API", "sublabel": "api.notion.com/v1/pages", "tag": "2022-06-28", "pos": [680, 650], "size": [165, 64], "sources": [{ "path": "supabase/functions/notion-calendar/index.ts", "line": 60 }] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Supabase ClipDesk (api:54321 / db:54322 / edge per_worker)", "wraps": ["edge_clip", "edge_clips", "edge_enrich", "db", "auth", "opencode"], "pad": 16 },
+    { "kind": "security-group", "label": "Public: ブラウザと拡張", "wraps": ["ext", "web"], "pad": 14 },
+    { "kind": "security-group", "label": "Localhost 127.0.0.1", "wraps": ["bridge", "obsidian"], "pad": 14 }
+  ],
+  "connections": [
+    { "id": "ext_to_clip", "from": "ext", "to": "edge_clip", "label": "POST clip (x-api-key)", "variant": "emphasis" },
+    { "id": "clip_to_db", "from": "edge_clip", "to": "db", "label": "insert pending", "variant": "security", "via": [[600, 152], [600, 292]], "labelAt": [625, 200] },
+    { "id": "clip_to_enrich", "from": "edge_clip", "to": "edge_enrich", "label": "enqueue enrich-clip", "variant": "dashed", "via": [[560, 184], [560, 530]], "labelAt": [560, 398] },
+    { "id": "enrich_to_opencode", "from": "edge_enrich", "to": "opencode", "label": "summarize JSON", "labelAt": [595, 545] },
+    { "id": "enrich_to_db", "from": "edge_enrich", "to": "db", "label": "update summary", "via": [[640, 562], [640, 292]], "labelAt": [640, 400] },
+    { "id": "web_to_clips", "from": "web", "to": "edge_clips", "label": "poll GET /clips (JWT)" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "主経路: 拡張クリップ投稿", "items": ["拡張 content.js が本文抽出→ background が x-api-key で POST /functions/v1/clip", "clip は user_api_keys(SHA-256)で user_id解決、clips に pending で insert、未要約なら enrich-clip を fire-and-forget（authはJWT/Bearerでも可）", "enrich-clip は rawBody>text>fetchPage の優先で AI 入力を構築し OpenCode zen/go に JSON要約を要求", "Web は 5秒ポーリングで GET /functions/v1/clips (Bearer JWT) を RLS越しに取得（clips他はJWT/RSL、authが検証）"] },
+    { "dot": "emerald", "title": "信頼境界と認証", "items": ["Public: 拡張/Web はインターネット到達。clip のみ x-api-key(cdk_+SHA-256)を優先し JWTフォールバック", "Authenticated: clips/categories/settings 等は JWTのみ、RLSは user_id=auth.uid()で分離（図では clips→DB、auth→clips は一括して表現）", "ServiceRole: Edge Functions は SB_SERVICE_ROLE_KEYで RLSバイパス（0002）", "Localhost: Bridge :3002(CORS *)→Obsidian :27123 は 127.0.0.1閉域、認可は Obsidian APIキー Bearer"] },
+    { "dot": "violet", "title": "外部依存（推測なし）", "items": ["OpenCode AI: https://opencode.ai/zen/go/v1/chat/completions（ai.ts:160, gpt-4o-mini）", "Notion: https://api.notion.com/v1/pages Notion-Version 2022-06-28（notion-calendar:73）", "Obsidian: http://127.0.0.1:27123 PUT /vault/{encodePath}（bridge:209, markdown）", "DB: Postgres17 + pg_cron 日次0時 DELETE deleted_at<=now()-7days（0007）"] },
+    { "dot": "amber", "title": "補足（エッジを増やさない）", "items": ["collect は中止中のため図から除外（実装は rss.ts/fetchPage.ts に残置）", "Obsidian/Notion 連携はカードに集約：Web→拡張→Bridge→Obsidian、clips→Notion は外部連携パス", "Vite proxy: /functions/v1→127.0.0.1:54321、/api→旧Express :3001（非推奨）", "本資料は architecture/ に保存（Pages公開 docs/ とは分離）、旧SQLiteは非推奨残置"] },
+    { "dot": "slate", "title": "検証と運用", "items": ["本JSONは showcase 9checksを満たす正本。HTMLと共に architecture/ に凍結保存", "CI: .github/workflows/deploy.yml で main push時に docsビルド・db push・functions deploy・addon zip", "README掲載時は architecture/clipdesk-architecture.html への相対リンクで参照"] }
+  ]
+}

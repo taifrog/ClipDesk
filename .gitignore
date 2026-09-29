@@ -28,3 +28,6 @@ docs
 
 # Chrome 拡張機能のローカル環境変数
 addon-chrome/.env
+
+# アーキテクチャ図の生成物（jsonから再生成可能なため Git 管理しない）
+architecture/*.html
