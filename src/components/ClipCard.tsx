@@ -40,12 +40,13 @@ function toDatetimeLocalValue(isoString: string | null | undefined): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-// datetime-local 入力値を ISO 8601 (+09:00) 形式に変換する
+// datetime-local 入力値（JSTのローカル時刻）を ISO 8601 (+09:00) 形式に変換する
 function fromDatetimeLocalValue(value: string): string | null {
   if (!value) return null
-  const date = new Date(value)
-  if (isNaN(date.getTime())) return null
-  return date.toISOString().replace('Z', '+09:00')
+  const m = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(:\d{2})?$/.exec(value)
+  if (!m) return null
+  const sec = m[2] ?? ':00'
+  return `${m[1]}${sec}+09:00`
 }
 
 // お気に入りアイコン（星）を表示するコンポーネント
