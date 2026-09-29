@@ -4,6 +4,12 @@
   "command": "visual-check",
   "status": "fail",
   "visualReview": "pending",
+  "manualReview": {
+    "reviewer": "taifrog",
+    "result": "ok",
+    "date": "2026-09-29",
+    "note": "htmlを目視で再チェックし問題なしを確認（自動Chrome検査のfailは環境要因のため記録として残す）"
+  },
   "artifact": {
     "path": "C:\\data\\Github\\ClipDesk\\architecture\\clipdesk-architecture.html",
     "sha256": "ee37f99397aaabb3abef770458c6d910bca702fa2d48eec8fd75815fe53cd9d6",
