@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
-import type { AiSummarySettings, ExtensionSettings, NotionSettings, ObsidianSettings, SourceSite, UserApiKey } from '../types'
+import type { AiSummarySettings, ExtensionSettings, GoogleCalendarItem, GoogleCalendarSettings, ObsidianSettings, SourceSite, UserApiKey } from '../types'
 
 // 設定ダイアログのプロパティ
 interface SettingsDialogProps {
@@ -8,7 +8,7 @@ interface SettingsDialogProps {
   sourceSites: SourceSite[]
   aiSummarySettings: AiSummarySettings
   obsidianSettings: ObsidianSettings
-  notionSettings: NotionSettings
+  googleSettings: GoogleCalendarSettings
   extensionSettings: ExtensionSettings
   apiKeys: UserApiKey[]
   isLoadingApiKeys: boolean
@@ -21,7 +21,8 @@ interface SettingsDialogProps {
   onDeleteSourceSite: (id: number) => Promise<void>
   onSaveAiSummarySettings: (settings: AiSummarySettings) => Promise<void>
   onSaveObsidianSettings: (settings: ObsidianSettings) => Promise<void>
-  onSaveNotionSettings: (settings: NotionSettings) => Promise<void>
+  onSaveGoogleSettings: (settings: GoogleCalendarSettings) => Promise<void>
+  onFetchGoogleCalendars: () => Promise<GoogleCalendarItem[]>
   onSaveExtensionSettings: (settings: ExtensionSettings) => Promise<void>
   onFetchApiKeys: () => Promise<void>
   onCreateApiKey: (label: string) => Promise<void>
@@ -77,35 +78,12 @@ URL: {{url}}
 `,
 }
 
-// Notion カレンダー連携のデフォルト設定値
-const DEFAULT_NOTION_SETTINGS: NotionSettings = {
-  apiKey: '',
-  databaseId: '',
-  datePropertyName: 'Date',
-  titlePropertyName: 'Name',
-  urlPropertyName: 'URL',
-  summaryPropertyName: 'Summary',
-}
-
-// Notion のデータベース URL / ID から 32 文字の ID 部分を抽出する
-// 例：
-//   https://www.notion.so/Calendar-Name-15c8a4d4a4e442a591d26685d5d50bd5
-//   https://www.notion.so/myworkspace/15c8a4d4-a4e4-42a5-91d2-6685d5d50bd5?v=...
-//   15c8a4d4a4e442a591d26685d5d50bd5?v=...
-// いずれも 15c8a4d4a4e442a591d26685d5d50bd5 に正規化する
-function extractNotionDatabaseId(input: string): string {
-  const cleaned = input.trim()
-  // クエリ文字列を除去する
-  const withoutQuery = cleaned.split('?')[0]
-  // ハイフンを除去して英数字のみにする
-  const normalized = withoutQuery.replace(/-/g, '')
-  // 末尾にある 32 文字の英数字を ID として抽出する
-  const match = normalized.match(/([0-9a-f]{32})$/i)
-  if (match) {
-    return match[1]
-  }
-  // 32 文字の ID が見つからない場合は、少なくとも ?v=... を取り除いた値を返す
-  return withoutQuery
+// Googleカレンダー連携のデフォルト設定値
+const DEFAULT_GOOGLE_SETTINGS: GoogleCalendarSettings = {
+  clientId: '',
+  clientSecret: '',
+  refreshToken: '',
+  calendarId: 'kenmichi@gmail.com',
 }
 
 // 設定ダイアログ
@@ -115,7 +93,7 @@ export function SettingsDialog({
   sourceSites,
   aiSummarySettings,
   obsidianSettings,
-  notionSettings,
+  googleSettings,
   extensionSettings,
   apiKeys,
   isLoadingApiKeys,
@@ -127,7 +105,8 @@ export function SettingsDialog({
   onDeleteSourceSite,
   onSaveAiSummarySettings,
   onSaveObsidianSettings,
-  onSaveNotionSettings,
+  onSaveGoogleSettings,
+  onFetchGoogleCalendars,
   onSaveExtensionSettings,
   onFetchApiKeys,
   onCreateApiKey,
@@ -168,12 +147,18 @@ export function SettingsDialog({
   // Obsidian 連携設定保存完了メッセージ
   const [obsidianSettingsSavedMessage, setObsidianSettingsSavedMessage] = useState<string | null>(null)
 
-  // Notion カレンダー連携設定のローカル編集用状態
-  const [localNotionSettings, setLocalNotionSettings] = useState<NotionSettings>(DEFAULT_NOTION_SETTINGS)
-  // Notion カレンダー連携設定保存中フラグ
-  const [isSavingNotionSettings, setIsSavingNotionSettings] = useState<boolean>(false)
-  // Notion カレンダー連携設定保存完了メッセージ
-  const [notionSettingsSavedMessage, setNotionSettingsSavedMessage] = useState<string | null>(null)
+  // Googleカレンダー連携設定のローカル編集用状態
+  const [localGoogleSettings, setLocalGoogleSettings] = useState<GoogleCalendarSettings>(DEFAULT_GOOGLE_SETTINGS)
+  // Googleカレンダー連携設定保存中フラグ
+  const [isSavingGoogleSettings, setIsSavingGoogleSettings] = useState<boolean>(false)
+  // Googleカレンダー連携設定保存完了メッセージ
+  const [googleSettingsSavedMessage, setGoogleSettingsSavedMessage] = useState<string | null>(null)
+  // カレンダー一覧（ドロップダウン表示用）
+  const [calendars, setCalendars] = useState<GoogleCalendarItem[]>([])
+  // カレンダー一覧取得中フラグ
+  const [isFetchingCalendars, setIsFetchingCalendars] = useState<boolean>(false)
+  // カレンダー一覧取得エラー
+  const [calendarsError, setCalendarsError] = useState<string | null>(null)
 
   // Chrome 拡張機能連携設定のローカル編集用状態
   const [localExtensionSettings, setLocalExtensionSettings] = useState<ExtensionSettings>(DEFAULT_EXTENSION_SETTINGS)
@@ -227,15 +212,13 @@ export function SettingsDialog({
         noteTemplate: obsidianSettings.noteTemplate ?? DEFAULT_OBSIDIAN_SETTINGS.noteTemplate,
       })
       setObsidianSettingsSavedMessage(null)
-      setLocalNotionSettings({
-        apiKey: notionSettings.apiKey ?? DEFAULT_NOTION_SETTINGS.apiKey,
-        databaseId: notionSettings.databaseId ?? DEFAULT_NOTION_SETTINGS.databaseId,
-        datePropertyName: notionSettings.datePropertyName || DEFAULT_NOTION_SETTINGS.datePropertyName,
-        titlePropertyName: notionSettings.titlePropertyName || DEFAULT_NOTION_SETTINGS.titlePropertyName,
-        urlPropertyName: notionSettings.urlPropertyName || DEFAULT_NOTION_SETTINGS.urlPropertyName,
-        summaryPropertyName: notionSettings.summaryPropertyName || DEFAULT_NOTION_SETTINGS.summaryPropertyName,
+      setLocalGoogleSettings({
+        clientId: googleSettings.clientId ?? DEFAULT_GOOGLE_SETTINGS.clientId,
+        clientSecret: googleSettings.clientSecret ?? DEFAULT_GOOGLE_SETTINGS.clientSecret,
+        refreshToken: googleSettings.refreshToken ?? DEFAULT_GOOGLE_SETTINGS.refreshToken,
+        calendarId: googleSettings.calendarId ?? DEFAULT_GOOGLE_SETTINGS.calendarId,
       })
-      setNotionSettingsSavedMessage(null)
+      setGoogleSettingsSavedMessage(null)
       setLocalExtensionSettings({
         extensionId: extensionSettings.extensionId ?? DEFAULT_EXTENSION_SETTINGS.extensionId,
       })
@@ -243,7 +226,7 @@ export function SettingsDialog({
       // API キー一覧を取得する
       onFetchApiKeys().catch((err) => console.error('API キー一覧取得失敗:', err))
     }
-  }, [isOpen, aiSummarySettings, obsidianSettings, notionSettings, extensionSettings, onFetchApiKeys])
+  }, [isOpen, aiSummarySettings, obsidianSettings, googleSettings, extensionSettings, onFetchApiKeys])
 
   // ダイアログを閉じるときに新規発行キー表示をクリアする
   const handleClose = () => {
@@ -527,32 +510,47 @@ export function SettingsDialog({
     }
   }
 
-  // Notion カレンダー連携設定の入力値変更時の処理
-  const handleNotionSettingsChange = (updates: Partial<NotionSettings>) => {
-    setLocalNotionSettings((prev) => ({ ...prev, ...updates }))
+  // Googleカレンダー連携設定の入力値変更時の処理
+  const handleGoogleSettingsChange = (updates: Partial<GoogleCalendarSettings>) => {
+    setLocalGoogleSettings((prev) => ({ ...prev, ...updates }))
     // 入力が変わったら保存済みメッセージを消す
-    setNotionSettingsSavedMessage(null)
+    setGoogleSettingsSavedMessage(null)
   }
 
-  // Notion カレンダー連携設定保存ボタン押下時の処理
-  const handleSaveNotionSettings = async (e: React.FormEvent) => {
+  // カレンダー一覧取得ボタン押下時の処理
+  const handleFetchCalendars = async () => {
+    setIsFetchingCalendars(true)
+    setCalendarsError(null)
+    try {
+      const list = await onFetchGoogleCalendars()
+      setCalendars(list)
+      if (list.length === 0) {
+        setCalendarsError('カレンダーが見つかりませんでした')
+      }
+    } catch (err) {
+      setCalendarsError(err instanceof Error ? err.message : 'カレンダー一覧の取得に失敗しました')
+    } finally {
+      setIsFetchingCalendars(false)
+    }
+  }
+
+  // Googleカレンダー連携設定保存ボタン押下時の処理
+  const handleSaveGoogleSettings = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsSavingNotionSettings(true)
+    setIsSavingGoogleSettings(true)
     setError(null)
     try {
-      await onSaveNotionSettings({
-        apiKey: localNotionSettings.apiKey.trim(),
-        databaseId: extractNotionDatabaseId(localNotionSettings.databaseId),
-        datePropertyName: localNotionSettings.datePropertyName.trim() || DEFAULT_NOTION_SETTINGS.datePropertyName,
-        titlePropertyName: localNotionSettings.titlePropertyName.trim() || DEFAULT_NOTION_SETTINGS.titlePropertyName,
-        urlPropertyName: localNotionSettings.urlPropertyName.trim() || DEFAULT_NOTION_SETTINGS.urlPropertyName,
-        summaryPropertyName: localNotionSettings.summaryPropertyName.trim() || DEFAULT_NOTION_SETTINGS.summaryPropertyName,
+      await onSaveGoogleSettings({
+        clientId: localGoogleSettings.clientId.trim(),
+        clientSecret: localGoogleSettings.clientSecret.trim(),
+        refreshToken: localGoogleSettings.refreshToken.trim(),
+        calendarId: localGoogleSettings.calendarId.trim() || DEFAULT_GOOGLE_SETTINGS.calendarId,
       })
-      setNotionSettingsSavedMessage('Notion カレンダー連携設定を保存しました')
+      setGoogleSettingsSavedMessage('Googleカレンダー連携設定を保存しました')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Notion カレンダー連携設定の保存に失敗しました')
+      setError(err instanceof Error ? err.message : 'Googleカレンダー連携設定の保存に失敗しました')
     } finally {
-      setIsSavingNotionSettings(false)
+      setIsSavingGoogleSettings(false)
     }
   }
 
@@ -732,91 +730,94 @@ export function SettingsDialog({
 
         <hr className="settings-divider" />
 
-        {/* Notion カレンダー連携設定 */}
+        {/* Googleカレンダー連携設定 */}
         <section className="settings-section">
-          <h3 className="settings-section-title">Notion カレンダー連携設定</h3>
+          <h3 className="settings-section-title">Googleカレンダー連携設定</h3>
           <p className="dialog-description">
-            イベント情報を持つクリップを Notion データベース（カレンダー）に登録するための設定です。
+            イベント情報を持つクリップを Googleカレンダーに登録するための設定です。Client ID・Client Secret・Refresh Tokenの取得手順はREADMEを参照してください。
           </p>
-          <form onSubmit={handleSaveNotionSettings} className="settings-form settings-form-vertical">
+          <form onSubmit={handleSaveGoogleSettings} className="settings-form settings-form-vertical">
             <div className="form-group">
-              <label htmlFor="notion-api-key">Notion Integration Token</label>
+              <label htmlFor="google-client-id">Client ID</label>
               <input
-                id="notion-api-key"
+                id="google-client-id"
+                type="text"
+                value={localGoogleSettings.clientId}
+                onChange={(e) => handleGoogleSettingsChange({ clientId: e.target.value })}
+                placeholder="xxxx.apps.googleusercontent.com"
+                disabled={isSavingGoogleSettings}
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="google-client-secret">Client Secret</label>
+              <input
+                id="google-client-secret"
                 type="password"
-                value={localNotionSettings.apiKey}
-                onChange={(e) => handleNotionSettingsChange({ apiKey: e.target.value })}
-                placeholder="secret_..."
-                disabled={isSavingNotionSettings}
+                value={localGoogleSettings.clientSecret}
+                onChange={(e) => handleGoogleSettingsChange({ clientSecret: e.target.value })}
+                placeholder="GOCSPX-..."
+                disabled={isSavingGoogleSettings}
               />
             </div>
 
             <div className="form-group">
-              <label htmlFor="notion-database-id">Notion データベース ID（URL のまま貼り付け可）</label>
+              <label htmlFor="google-refresh-token">Refresh Token</label>
               <input
-                id="notion-database-id"
-                type="text"
-                value={localNotionSettings.databaseId}
-                onChange={(e) => handleNotionSettingsChange({ databaseId: e.target.value })}
-                placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                disabled={isSavingNotionSettings}
+                id="google-refresh-token"
+                type="password"
+                value={localGoogleSettings.refreshToken}
+                onChange={(e) => handleGoogleSettingsChange({ refreshToken: e.target.value })}
+                placeholder="1//..."
+                disabled={isSavingGoogleSettings}
               />
             </div>
 
             <div className="form-group">
-              <label htmlFor="notion-title-property">タイトルプロパティ名</label>
-              <input
-                id="notion-title-property"
-                type="text"
-                value={localNotionSettings.titlePropertyName}
-                onChange={(e) => handleNotionSettingsChange({ titlePropertyName: e.target.value })}
-                placeholder="Name"
-                disabled={isSavingNotionSettings}
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="notion-date-property">日付プロパティ名</label>
-              <input
-                id="notion-date-property"
-                type="text"
-                value={localNotionSettings.datePropertyName}
-                onChange={(e) => handleNotionSettingsChange({ datePropertyName: e.target.value })}
-                placeholder="Date"
-                disabled={isSavingNotionSettings}
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="notion-url-property">URL プロパティ名</label>
-              <input
-                id="notion-url-property"
-                type="text"
-                value={localNotionSettings.urlPropertyName}
-                onChange={(e) => handleNotionSettingsChange({ urlPropertyName: e.target.value })}
-                placeholder="URL"
-                disabled={isSavingNotionSettings}
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="notion-summary-property">要約プロパティ名</label>
-              <input
-                id="notion-summary-property"
-                type="text"
-                value={localNotionSettings.summaryPropertyName}
-                onChange={(e) => handleNotionSettingsChange({ summaryPropertyName: e.target.value })}
-                placeholder="Summary"
-                disabled={isSavingNotionSettings}
-              />
+              <label htmlFor="google-calendar-id">登録先カレンダー</label>
+              <div className="calendar-select-row">
+                <input
+                  id="google-calendar-id"
+                  type="text"
+                  value={localGoogleSettings.calendarId}
+                  onChange={(e) => handleGoogleSettingsChange({ calendarId: e.target.value })}
+                  placeholder="kenmichi@gmail.com（空欄は primary）"
+                  disabled={isSavingGoogleSettings}
+                />
+                <button
+                  type="button"
+                  className="button-secondary button-small"
+                  onClick={handleFetchCalendars}
+                  disabled={isFetchingCalendars || !localGoogleSettings.clientId || !localGoogleSettings.clientSecret || !localGoogleSettings.refreshToken}
+                >
+                  {isFetchingCalendars ? '取得中…' : 'カレンダー一覧を取得'}
+                </button>
+              </div>
+              {calendarsError && <p className="dialog-error">{calendarsError}</p>}
+              {calendars.length > 0 && (
+                <select
+                  aria-label="カレンダー一覧から選択"
+                  value={localGoogleSettings.calendarId}
+                  onChange={(e) => handleGoogleSettingsChange({ calendarId: e.target.value })}
+                  disabled={isSavingGoogleSettings}
+                  className="calendar-select"
+                >
+                  <option value="">一覧から選択…</option>
+                  {calendars.map((cal) => (
+                    <option key={cal.id} value={cal.id} disabled={cal.accessRole === 'reader'}>
+                      {cal.summary}（{cal.id}）{cal.primary ? '（既定）' : ''}{cal.accessRole === 'reader' ? '：読み取り専用のため選択不可' : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div className="settings-form-actions">
-              <button type="submit" className="button-primary" disabled={isSavingNotionSettings}>
-                {isSavingNotionSettings ? '保存中…' : 'Notion 連携設定を保存'}
+              <button type="submit" className="button-primary" disabled={isSavingGoogleSettings}>
+                {isSavingGoogleSettings ? '保存中…' : 'Google連携設定を保存'}
               </button>
-              {notionSettingsSavedMessage && (
-                <span className="save-success-message">{notionSettingsSavedMessage}</span>
+              {googleSettingsSavedMessage && (
+                <span className="save-success-message">{googleSettingsSavedMessage}</span>
               )}
             </div>
           </form>

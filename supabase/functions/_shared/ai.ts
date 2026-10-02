@@ -24,21 +24,18 @@ export interface ObsidianSettings {
   noteTemplate: string;
 }
 
-// Notion カレンダー連携設定を表す型
-// Notion データベースへクリップのイベント情報を登録するための設定
-export interface NotionSettings {
-  // Notion Integration Token（secret_...）
-  apiKey: string;
-  // 登録先の Notion データベース ID
-  databaseId: string;
-  // 日付情報を格納するプロパティ名
-  datePropertyName: string;
-  // タイトルを格納するプロパティ名
-  titlePropertyName: string;
-  // URL を格納するプロパティ名
-  urlPropertyName: string;
-  // 要約を格納するプロパティ名
-  summaryPropertyName: string;
+// Googleカレンダー連携設定を表す型
+// Edge Function がリフレッシュトークン方式で Google Calendar API へ登録するための設定
+// 設計書 01_design_google-calendar.md M6 に対応する（旧設定型を置換）
+export interface GoogleCalendarSettings {
+  // Google Cloud OAuthクライアントID
+  clientId: string;
+  // Google Cloud OAuthクライアントシークレット
+  clientSecret: string;
+  // 一度だけ取得するリフレッシュトークン
+  refreshToken: string;
+  // 登録先カレンダーID（空文字は primary 扱い）
+  calendarId: string;
 }
 
 // Chrome 拡張機能連携設定を表す型

@@ -866,8 +866,8 @@
   align-self: center;
 }
 
-/* クリップカードの Notion カレンダー登録ボタン */
-.clip-card-notion {
+/* クリップカードの Googleカレンダー登録ボタン */
+.clip-card-google {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -880,15 +880,15 @@
   transition: background 0.2s, color 0.2s;
 }
 
-.clip-card-notion:hover {
+.clip-card-google:hover {
   background: var(--accent-bg);
 }
 
-.clip-card-notion:hover .notion-icon {
+.clip-card-google:hover .google-icon {
   fill: var(--accent);
 }
 
-.notion-icon {
+.google-icon {
   width: 18px;
   height: 18px;
   fill: var(--text);
@@ -896,7 +896,7 @@
   opacity: 0.7;
 }
 
-.clip-card-list .clip-card-notion {
+.clip-card-list .clip-card-google {
   align-self: center;
 }
 

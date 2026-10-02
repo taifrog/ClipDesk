@@ -1,7 +1,7 @@
 // アプリ設定取得用ヘルパー
 
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.49.0';
-import { AiSummarySettings, ExtensionSettings, NotionSettings, ObsidianSettings } from './ai.ts';
+import { AiSummarySettings, ExtensionSettings, GoogleCalendarSettings, ObsidianSettings } from './ai.ts';
 
 // デバッグメッセージ出力用関数
 // @param msg 出力する文字列
@@ -54,22 +54,21 @@ const DEFAULT_EXTENSION_SETTINGS: ExtensionSettings = {
   extensionId: '',
 };
 
-// Notion カレンダー連携設定のデフォルト値
-const DEFAULT_NOTION_SETTINGS: NotionSettings = {
-  apiKey: '',
-  databaseId: '',
-  datePropertyName: 'Date',
-  titlePropertyName: 'Name',
-  urlPropertyName: 'URL',
-  summaryPropertyName: 'Summary',
+// Googleカレンダー連携設定のデフォルト値
+// 登録先の既定は n8n と同一の kenmichi@gmail.com とする（設計 M5）
+const DEFAULT_GOOGLE_SETTINGS: GoogleCalendarSettings = {
+  clientId: '',
+  clientSecret: '',
+  refreshToken: '',
+  calendarId: 'kenmichi@gmail.com',
 };
 
-// アプリ設定全体（AI 要約設定 + Obsidian 連携設定 + 拡張機能連携設定 + Notion カレンダー連携設定）
+// アプリ設定全体（AI 要約設定 + Obsidian 連携設定 + 拡張機能連携設定 + Googleカレンダー連携設定）
 export interface AppSettings {
   aiSummary: AiSummarySettings;
   obsidian: ObsidianSettings;
   extension: ExtensionSettings;
-  notion: NotionSettings;
+  google: GoogleCalendarSettings;
 }
 
 // 指定ユーザーのアプリ設定全体を取得する
@@ -81,7 +80,7 @@ export async function getAppSettings(
   const { data, error } = await supabase
     .from('app_settings')
     .select(
-      'ai_summary_enabled, ai_summary_api_key, ai_summary_model, ai_summary_language, obsidian_api_key, obsidian_folder, obsidian_filename_template, obsidian_note_template, extension_id, notion_api_key, notion_database_id, notion_date_property, notion_title_property, notion_url_property, notion_summary_property',
+      'ai_summary_enabled, ai_summary_api_key, ai_summary_model, ai_summary_language, obsidian_api_key, obsidian_folder, obsidian_filename_template, obsidian_note_template, extension_id, google_client_id, google_client_secret, google_refresh_token, google_calendar_id',
     )
     .eq('user_id', userId)
     .maybeSingle();
@@ -91,7 +90,7 @@ export async function getAppSettings(
       aiSummary: DEFAULT_AI_SUMMARY_SETTINGS,
       obsidian: DEFAULT_OBSIDIAN_SETTINGS,
       extension: DEFAULT_EXTENSION_SETTINGS,
-      notion: DEFAULT_NOTION_SETTINGS,
+      google: DEFAULT_GOOGLE_SETTINGS,
     };
   }
 
@@ -116,13 +115,11 @@ export async function getAppSettings(
     extension: {
       extensionId: data.extension_id ?? DEFAULT_EXTENSION_SETTINGS.extensionId,
     },
-    notion: {
-      apiKey: data.notion_api_key ?? DEFAULT_NOTION_SETTINGS.apiKey,
-      databaseId: data.notion_database_id ?? DEFAULT_NOTION_SETTINGS.databaseId,
-      datePropertyName: data.notion_date_property ?? DEFAULT_NOTION_SETTINGS.datePropertyName,
-      titlePropertyName: data.notion_title_property ?? DEFAULT_NOTION_SETTINGS.titlePropertyName,
-      urlPropertyName: data.notion_url_property ?? DEFAULT_NOTION_SETTINGS.urlPropertyName,
-      summaryPropertyName: data.notion_summary_property ?? DEFAULT_NOTION_SETTINGS.summaryPropertyName,
+    google: {
+      clientId: data.google_client_id ?? DEFAULT_GOOGLE_SETTINGS.clientId,
+      clientSecret: data.google_client_secret ?? DEFAULT_GOOGLE_SETTINGS.clientSecret,
+      refreshToken: data.google_refresh_token ?? DEFAULT_GOOGLE_SETTINGS.refreshToken,
+      calendarId: data.google_calendar_id ?? DEFAULT_GOOGLE_SETTINGS.calendarId,
     },
   };
 }
@@ -188,24 +185,23 @@ export async function saveExtensionSettings(
   return updated.extension;
 }
 
-// 指定ユーザーの Notion カレンダー連携設定を保存する
-export async function saveNotionSettings(
+// 指定ユーザーの Googleカレンダー連携設定を保存する
+// なぜ Partial で受けるか: 設定画面で4項目をまとめて送るが、空文字の扱いを呼び出し側に委ねるため
+export async function saveGoogleSettings(
   supabase: SupabaseClient,
   userId: string,
-  settings: Partial<NotionSettings>,
-): Promise<NotionSettings> {
+  settings: Partial<GoogleCalendarSettings>,
+): Promise<GoogleCalendarSettings> {
   const upsert: Record<string, unknown> = {
     user_id: userId,
   };
-  if (typeof settings.apiKey === 'string') upsert.notion_api_key = settings.apiKey;
-  if (typeof settings.databaseId === 'string') upsert.notion_database_id = settings.databaseId;
-  if (typeof settings.datePropertyName === 'string') upsert.notion_date_property = settings.datePropertyName;
-  if (typeof settings.titlePropertyName === 'string') upsert.notion_title_property = settings.titlePropertyName;
-  if (typeof settings.urlPropertyName === 'string') upsert.notion_url_property = settings.urlPropertyName;
-  if (typeof settings.summaryPropertyName === 'string') upsert.notion_summary_property = settings.summaryPropertyName;
+  if (typeof settings.clientId === 'string') upsert.google_client_id = settings.clientId;
+  if (typeof settings.clientSecret === 'string') upsert.google_client_secret = settings.clientSecret;
+  if (typeof settings.refreshToken === 'string') upsert.google_refresh_token = settings.refreshToken;
+  if (typeof settings.calendarId === 'string') upsert.google_calendar_id = settings.calendarId;
 
-  debug(`saveNotionSettings upsert: apiKey=${typeof upsert.notion_api_key === 'string' ? '(set)' : '(not set)'}, databaseId=${typeof upsert.notion_database_id === 'string' ? '(set)' : '(not set)'}`);
+  debug(`saveGoogleSettings upsert: clientId=${typeof upsert.google_client_id === 'string' ? '(set)' : '(not set)'}, calendarId=${typeof upsert.google_calendar_id === 'string' ? '(set)' : '(not set)'}`);
   await supabase.from('app_settings').upsert(upsert, { onConflict: 'user_id' });
   const updated = await getAppSettings(supabase, userId);
-  return updated.notion;
+  return updated.google;
 }

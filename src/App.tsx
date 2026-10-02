@@ -31,7 +31,7 @@ import { CalendarView } from './components/CalendarView'
 import { AuthPanel } from './components/AuthPanel'
 import ShareTargetPage from './ShareTargetPage'
 import { getSupabaseClient } from './lib/supabase'
-import type { AiSummarySettings, Category, Clip, ExtensionSettings, NotionSettings, ObsidianExportRequest, ObsidianExportResult, ObsidianSettings, SortMode, SourceSite, UserApiKey, ViewMode } from './types'
+import type { AiSummarySettings, Category, Clip, ExtensionSettings, GoogleCalendarSettings, ObsidianExportRequest, ObsidianExportResult, ObsidianSettings, SortMode, SourceSite, UserApiKey, ViewMode } from './types'
 import './App.css'
 
 // AI要約設定のデフォルト値（Go必須ヘッダ化以降は gpt-4o-mini 非対応。既定は glm-5.3-flash）
@@ -77,14 +77,12 @@ URL: {{url}}
 `,
 }
 
-// Notion カレンダー連携設定のデフォルト値
-const DEFAULT_NOTION_SETTINGS: NotionSettings = {
-  apiKey: '',
-  databaseId: '',
-  datePropertyName: 'Date',
-  titlePropertyName: 'Name',
-  urlPropertyName: 'URL',
-  summaryPropertyName: 'Summary',
+// Googleカレンダー連携設定のデフォルト値
+const DEFAULT_GOOGLE_SETTINGS: GoogleCalendarSettings = {
+  clientId: '',
+  clientSecret: '',
+  refreshToken: '',
+  calendarId: 'kenmichi@gmail.com',
 }
 
 // Supabase Edge Functions のベースパスを環境に応じて決定する
@@ -118,10 +116,10 @@ function normalizeApiClip(raw: Record<string, unknown>): Clip {
     aiEnrichmentStatus: (raw.ai_enrichment_status as 'pending' | 'processing' | 'completed' | 'failed') || null,
     obsidianPending: Boolean(raw.obsidian_pending),
     obsidianExportedAt: raw.obsidian_exported_at ? String(raw.obsidian_exported_at) : null,
-    notionExported: Boolean(raw.notion_exported),
-    notionExportedAt: raw.notion_exported_at ? String(raw.notion_exported_at) : null,
-    notionPageId: raw.notion_page_id ? String(raw.notion_page_id) : null,
-    notionPageUrl: raw.notion_page_url ? String(raw.notion_page_url) : null,
+    googleExported: Boolean(raw.google_exported),
+    googleExportedAt: raw.google_exported_at ? String(raw.google_exported_at) : null,
+    googleEventId: raw.google_event_id ? String(raw.google_event_id) : null,
+    googleEventUrl: raw.google_event_url ? String(raw.google_event_url) : null,
   }
 }
 
@@ -202,8 +200,8 @@ function App() {
   const [aiSummarySettings, setAiSummarySettings] = useState<AiSummarySettings>(DEFAULT_AI_SUMMARY_SETTINGS)
   // Obsidian 連携設定の状態
   const [obsidianSettings, setObsidianSettings] = useState<ObsidianSettings>(DEFAULT_OBSIDIAN_SETTINGS)
-  // Notion カレンダー連携設定の状態
-  const [notionSettings, setNotionSettings] = useState<NotionSettings>(DEFAULT_NOTION_SETTINGS)
+  // Googleカレンダー連携設定の状態
+  const [googleSettings, setGoogleSettings] = useState<GoogleCalendarSettings>(DEFAULT_GOOGLE_SETTINGS)
   // Chrome 拡張機能連携設定の状態
   const [extensionSettings, setExtensionSettings] = useState<ExtensionSettings>(DEFAULT_EXTENSION_SETTINGS)
   // クリップ収集ダイアログの表示状態
@@ -289,11 +287,11 @@ function App() {
         throw new Error(`設定の取得に失敗しました: ${response.status}`)
       }
       const data = await response.json()
-      // Edge Function は { settings: { aiSummary, obsidian, extension, notion } } の形で返す
+      // Edge Function は { settings: { aiSummary, obsidian, extension, google } } の形で返す
       const aiSettings: AiSummarySettings = data.settings?.aiSummary || DEFAULT_AI_SUMMARY_SETTINGS
       const obsSettings: ObsidianSettings = data.settings?.obsidian || DEFAULT_OBSIDIAN_SETTINGS
       const extSettings: ExtensionSettings = data.settings?.extension || DEFAULT_EXTENSION_SETTINGS
-      const notionSettingsData: NotionSettings = data.settings?.notion || DEFAULT_NOTION_SETTINGS
+      const googleSettingsData: GoogleCalendarSettings = data.settings?.google || DEFAULT_GOOGLE_SETTINGS
       setAiSummarySettings({
         enabled: aiSettings.enabled ?? DEFAULT_AI_SUMMARY_SETTINGS.enabled,
         apiKey: aiSettings.apiKey ?? DEFAULT_AI_SUMMARY_SETTINGS.apiKey,
@@ -309,13 +307,11 @@ function App() {
       setExtensionSettings({
         extensionId: extSettings.extensionId ?? DEFAULT_EXTENSION_SETTINGS.extensionId,
       })
-      setNotionSettings({
-        apiKey: notionSettingsData.apiKey ?? DEFAULT_NOTION_SETTINGS.apiKey,
-        databaseId: notionSettingsData.databaseId ?? DEFAULT_NOTION_SETTINGS.databaseId,
-        datePropertyName: notionSettingsData.datePropertyName || DEFAULT_NOTION_SETTINGS.datePropertyName,
-        titlePropertyName: notionSettingsData.titlePropertyName || DEFAULT_NOTION_SETTINGS.titlePropertyName,
-        urlPropertyName: notionSettingsData.urlPropertyName || DEFAULT_NOTION_SETTINGS.urlPropertyName,
-        summaryPropertyName: notionSettingsData.summaryPropertyName || DEFAULT_NOTION_SETTINGS.summaryPropertyName,
+      setGoogleSettings({
+        clientId: googleSettingsData.clientId ?? DEFAULT_GOOGLE_SETTINGS.clientId,
+        clientSecret: googleSettingsData.clientSecret ?? DEFAULT_GOOGLE_SETTINGS.clientSecret,
+        refreshToken: googleSettingsData.refreshToken ?? DEFAULT_GOOGLE_SETTINGS.refreshToken,
+        calendarId: googleSettingsData.calendarId ?? DEFAULT_GOOGLE_SETTINGS.calendarId,
       })
     } catch (err) {
       console.error('設定取得失敗:', err)
@@ -968,34 +964,49 @@ function App() {
     })
   }
 
-  // Notion カレンダー連携設定保存時の処理
-  const handleSaveNotionSettings = async (settings: NotionSettings) => {
+  // Googleカレンダー連携設定保存時の処理
+  const handleSaveGoogleSettings = async (settings: GoogleCalendarSettings) => {
     const response = await fetch(`${FUNCTIONS_BASE}/settings`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({
-        notionApiKey: settings.apiKey,
-        notionDatabaseId: settings.databaseId,
-        notionDatePropertyName: settings.datePropertyName,
-        notionTitlePropertyName: settings.titlePropertyName,
-        notionUrlPropertyName: settings.urlPropertyName,
-        notionSummaryPropertyName: settings.summaryPropertyName,
+        googleClientId: settings.clientId,
+        googleClientSecret: settings.clientSecret,
+        googleRefreshToken: settings.refreshToken,
+        googleCalendarId: settings.calendarId,
       }),
     })
     if (!response.ok) {
       const data = await response.json().catch(() => ({}))
-      throw new Error(data.error || 'Notion 連携設定の保存に失敗しました')
+      throw new Error(data.error || 'Google連携設定の保存に失敗しました')
     }
     const data = await response.json()
-    const saved: NotionSettings = data.settings || settings
-    setNotionSettings({
-      apiKey: saved.apiKey ?? settings.apiKey,
-      databaseId: saved.databaseId ?? settings.databaseId,
-      datePropertyName: saved.datePropertyName || settings.datePropertyName,
-      titlePropertyName: saved.titlePropertyName || settings.titlePropertyName,
-      urlPropertyName: saved.urlPropertyName || settings.urlPropertyName,
-      summaryPropertyName: saved.summaryPropertyName || settings.summaryPropertyName,
+    const saved: GoogleCalendarSettings = data.settings || settings
+    setGoogleSettings({
+      clientId: saved.clientId ?? settings.clientId,
+      clientSecret: saved.clientSecret ?? settings.clientSecret,
+      refreshToken: saved.refreshToken ?? settings.refreshToken,
+      calendarId: saved.calendarId ?? settings.calendarId,
     })
+  }
+
+  // Googleカレンダー一覧を取得する（設定画面のドロップダウン用）
+  const handleFetchGoogleCalendars = async (): Promise<
+    { id: string; summary: string; primary: boolean; accessRole: string }[]
+  > => {
+    const response = await fetch(`${FUNCTIONS_BASE}/google-calendars`, {
+      headers: getAuthHeaders(false),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(data.error || 'カレンダー一覧の取得に失敗しました')
+    }
+    return ((data.calendars || []) as Record<string, unknown>[]).map((raw) => ({
+      id: String(raw.id),
+      summary: typeof raw.summary === 'string' && raw.summary ? String(raw.summary) : String(raw.id),
+      primary: Boolean(raw.primary),
+      accessRole: typeof raw.accessRole === 'string' ? String(raw.accessRole) : '',
+    }))
   }
 
   // クリップの Obsidian 書き出し予定フラグを切り替える
@@ -1082,44 +1093,44 @@ function App() {
     window.alert(`Obsidian に書き出しました:\n${result.path}`)
   }
 
-  // クリップ1件を Notion カレンダーに登録する
+  // クリップ1件を Googleカレンダーに登録する
   // 開始日が登録されているクリップのみ登録可能。成功後はゴミ箱へ移動する。
-  const handleExportToNotion = async (clip: Clip) => {
-    if (!notionSettings.apiKey || !notionSettings.databaseId) {
-      window.alert('Notion 連携設定が完了していません。設定から API キーとデータベース ID を入力してください。')
+  const handleExportToGoogle = async (clip: Clip) => {
+    if (!googleSettings.clientId || !googleSettings.clientSecret || !googleSettings.refreshToken) {
+      window.alert('Google連携設定が完了していません。設定から Client ID / Secret / Refresh Token を入力してください。')
       return
     }
     if (!clip.eventStartDate) {
-      window.alert('Notion カレンダーに登録するには、クリップにイベント開始日が必要です。')
+      window.alert('Googleカレンダーに登録するには、クリップにイベント開始日が必要です。')
       return
     }
 
-    const response = await fetch(`${FUNCTIONS_BASE}/notion-calendar`, {
+    const response = await fetch(`${FUNCTIONS_BASE}/google-calendar`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ clipId: clip.id }),
     })
     const data = await response.json().catch(() => ({}))
     if (!response.ok) {
-      window.alert(`Notion への登録に失敗しました:\n${data.error || '不明なエラー'}`)
+      window.alert(`Googleカレンダーへの登録に失敗しました:\n${data.error || '不明なエラー'}`)
       return
     }
 
     const exportedAt: string = data.exportedAt || new Date().toISOString()
-    // ローカル状態から通常クリップを削除し、ゴミ箱に Notion 登録済み状態で追加する
+    // ローカル状態から通常クリップを削除し、ゴミ箱に Google 登録済み状態で追加する
     setClips((prev) => prev.filter((c) => c.id !== clip.id))
     setTrashClips((prev) => [
       {
         ...clip,
-        notionExported: true,
-        notionExportedAt: exportedAt,
-        notionPageId: data.pageId || null,
-        notionPageUrl: data.pageUrl || null,
+        googleExported: true,
+        googleExportedAt: exportedAt,
+        googleEventId: data.eventId || null,
+        googleEventUrl: data.eventUrl || null,
         deletedAt: exportedAt,
       },
       ...prev.filter((c) => c.id !== clip.id),
     ])
-    window.alert(`Notion に登録しました。\n${data.pageUrl || ''}`)
+    window.alert(`Googleカレンダーに登録しました。\n${data.eventUrl || ''}`)
   }
 
   // Obsidian 書き出し予定のクリップを一括で書き出す
@@ -1328,7 +1339,7 @@ function App() {
       setSourceSites([])
       setSelectedCategoryId('today')
       setSearchQuery('')
-      setNotionSettings(DEFAULT_NOTION_SETTINGS)
+      setGoogleSettings(DEFAULT_GOOGLE_SETTINGS)
     } catch (err) {
       console.error('ログアウト失敗:', err)
     }
@@ -1401,7 +1412,7 @@ function App() {
         sourceSites={sourceSites}
         aiSummarySettings={aiSummarySettings}
         obsidianSettings={obsidianSettings}
-        notionSettings={notionSettings}
+        googleSettings={googleSettings}
         extensionSettings={extensionSettings}
         apiKeys={apiKeys}
         isLoadingApiKeys={isLoadingApiKeys}
@@ -1413,7 +1424,8 @@ function App() {
         onDeleteSourceSite={handleDeleteSourceSite}
         onSaveAiSummarySettings={handleSaveAiSummarySettings}
         onSaveObsidianSettings={handleSaveObsidianSettings}
-        onSaveNotionSettings={handleSaveNotionSettings}
+        onSaveGoogleSettings={handleSaveGoogleSettings}
+          onFetchGoogleCalendars={handleFetchGoogleCalendars}
         onSaveExtensionSettings={handleSaveExtensionSettings}
         onFetchApiKeys={fetchApiKeys}
         onCreateApiKey={handleCreateApiKey}
@@ -1482,7 +1494,7 @@ function App() {
                   onUpdateEventInfo={handleUpdateEventInfo}
                   onToggleObsidianPending={handleToggleObsidianPending}
                   onExportToObsidian={handleExportToObsidian}
-                  onExportToNotion={handleExportToNotion}
+                  onExportToGoogle={handleExportToGoogle}
                   onChangeCategory={handleChangeCategory}
                 />
               )
@@ -1503,7 +1515,7 @@ function App() {
                   onUpdateEventInfo={handleUpdateEventInfo}
                   onToggleObsidianPending={handleToggleObsidianPending}
                   onExportToObsidian={handleExportToObsidian}
-                  onExportToNotion={handleExportToNotion}
+                  onExportToGoogle={handleExportToGoogle}
                   onChangeCategory={handleChangeCategory}
                 />
               ) : (
@@ -1524,7 +1536,7 @@ function App() {
                   onUpdateEventInfo={handleUpdateEventInfo}
                   onToggleObsidianPending={handleToggleObsidianPending}
                   onExportToObsidian={handleExportToObsidian}
-                  onExportToNotion={handleExportToNotion}
+                  onExportToGoogle={handleExportToGoogle}
                   onRestore={handleRestoreClip}
                   onChangeCategory={handleChangeCategory}
                   onEmptyTrash={selectedCategoryId === 'trash' ? handleEmptyTrash : undefined}
