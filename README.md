@@ -148,14 +148,52 @@ Obsidian 書き出しが動作しない場合は、以下のログを確認し�
 
 拡張機能 Service Worker 内では、最大 200 件の直近ログがメモリに保持されています。
 
-### 9. クリップを投稿する
+### 9. Googleカレンダー連携を使う（オプション）
+
+イベント情報を持つクリップを Googleカレンダーに登録できます。登録後はクリップはゴミ箱へ移動します。
+
+#### 前提
+
+- Google アカウントを持っていること
+- Google Cloud プロジェクトで Google Calendar API が有効化されていること
+
+#### Google OAuth クライアントを作成する
+
+1. [Google Cloud Console](https://console.cloud.google.com/) でプロジェクトを選択（なければ作成）する
+2. 「APIとサービス」→「ライブラリ」で **Google Calendar API** を有効化する
+3. 「APIとサービス」→「認証情報」→「認証情報を作成」→「OAuthクライアントID」→種類は「ウェブアプリケーション」で作成する
+4. 「承認済みのリダイレクトURL」に `https://developers.google.com/oauthplayground` を追加する
+5. Client ID と Client Secret を控える
+6. 「OAuth 同意画面」でテストユーザーに自分の Gmail アドレスを追加する
+
+#### Refresh Token を取得する
+
+1. [OAuth 2.0 Playground](https://developers.google.com/oauthplayground/) を開く
+2. 右上の歯車→「Use your own OAuth credentials」にチェックし、上記の ID と Secret を入力する
+3. 左の一覧で「Calendar API v3」→ `https://www.googleapis.com/auth/calendar.events` にチェックする
+4. 「Input your own scopes」欄に `https://www.googleapis.com/auth/calendar.calendarlist.readonly` を入力して追加する（カレンダー一覧取得に必要）
+5. 「Authorize APIs」→ Google アカウントで承認する
+6. 「Exchange authorization code for tokens」を押して **refresh_token** を控える
+
+#### ClipDesk サイトで設定する
+
+1. Web アプリの「設定」→「Googleカレンダー連携設定」を開く
+2. **Client ID**・**Client Secret**・**Refresh Token** を入力する
+3. **登録先カレンダー**は「カレンダー一覧を取得」ボタンで一覧から選ぶか、ID を直接入力する（空欄は `primary`）
+4. 「Google連携設定を保存」を押す
+
+設定後は、イベント開始日のあるクリップカードのカレンダーボタンから登録できます。
+
+> **Note:** 以前の Notion カレンダー連携は廃止されました。`notion-calendar` Edge Function は `google-calendar` に置き換えられています。
+
+### 10. クリップを投稿する
 
 1. クリップしたいページを開く
 2. 拡張機能アイコンをクリック
 3. 「クリップを作成」ボタンを押す
 4. ClipDesk サイトにページ情報が投稿され、サイト側の設定に応じて要約が行われる
 
-### 10. サイトで整理する
+### 11. サイトで整理する
 
 - 左サイドバーからカテゴリを選択してフィルタリング
 - クリップカードをドラッグ＆ドロップでサイドバーのカテゴリに分類
