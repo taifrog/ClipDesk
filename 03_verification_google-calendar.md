@@ -14,7 +14,7 @@
 3. 「APIとサービス」→「認証情報」→「認証情報を作成」→「OAuthクライアントID」→種類は「ウェブアプリケーション」で作成する。
 4. Client ID と Client Secret を控える。
 5. [OAuth 2.0 Playground](https://developers.google.com/oauthplayground/)を開く。右上の歯車→「Use your own OAuth credentials」にチェックし、4のID/Secretを入力する。
-6. 左の一覧で「Calendar API v3」→ `https://www.googleapis.com/auth/calendar.events` にチェック→「Authorize APIs」→Googleアカウントで承認する。
+6. 左の一覧で「Calendar API v3」→ `https://www.googleapis.com/auth/calendar.events` にチェックする。さらに「Input your own scopes」欄に `https://www.googleapis.com/auth/calendar.calendarlist.readonly` を入力して追加する（カレンダー一覧取得に必要。eventsだけでは一覧が403になる）。2つともチェック→「Authorize APIs」→Googleアカウントで承認する。
 7. 「Exchange authorization code for tokens」を押す。返ってきた **refresh_token** を控える（access_tokenは使い捨てなので不要）。
 
 ### 0-2. ClipDesk側の反映（ユーザー作業・いずれか）

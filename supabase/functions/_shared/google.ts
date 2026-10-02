@@ -13,6 +13,8 @@ const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 const CALENDAR_API_BASE = 'https://www.googleapis.com/calendar/v3';
 // イベント登録・一覧取得に使う最小権限スコープ（設計で固定）
 export const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+// カレンダー一覧取得に必要な最小スコープ（calendarList.list用）
+export const GOOGLE_CALENDAR_LIST_SCOPE = 'https://www.googleapis.com/auth/calendar.calendarlist.readonly';
 
 // カレンダー一覧1件の正規化型
 // フロントのドロップダウン表示用に id / summary / primary / accessRole のみ返す
@@ -241,7 +243,7 @@ export async function listCalendars(accessToken: string): Promise<GoogleCalendar
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     if (response.status === 403) {
-      throw new GoogleApiError(403, 'FORBIDDEN', '権限がありません。スコープ https://www.googleapis.com/auth/calendar.events を確認してください');
+      throw new GoogleApiError(403, 'FORBIDDEN', '権限がありません。Refresh Token発行時にスコープ https://www.googleapis.com/auth/calendar.calendarlist.readonly を含めたか確認してください');
     }
     const message = typeof data?.error?.message === 'string' ? data.error.message : `Google Calendar API エラー（${response.status}）`;
     throw new GoogleApiError(response.status, 'CALENDAR_LIST_FAILED', message);

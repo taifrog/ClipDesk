@@ -134,7 +134,7 @@
 
 - 決定済み: B方式、Notion撤去、成功後ゴミ箱、Calendar ID可変（既定 `kenmichi@gmail.com`）。
 - 納品時に必要なもの: Google CloudでのClient ID/Secret発行とRefresh Token取得手順をマニュアル化する（OAuth Playgroundまたは `gcloud` 手順）。
-- スコープは `calendar.events` に限定するか `calendar` フルにするかは設計で推奨を示す（推奨: `calendar.events` 最小権限）。
+- スコープは `calendar.events`（イベント作成）＋ `calendar.calendarlist.readonly`（一覧取得、2026-10-02検証で追加）の2つとする。`calendarList.list` は `calendar.events` では403になるため。フル `calendar` への拡大はしない。
 
 ---
 

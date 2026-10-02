@@ -48,7 +48,7 @@
 
 - 外部API: `https://oauth2.googleapis.com/token`、`https://www.googleapis.com/calendar/v3/...` のみ。npm新規依存なし。Deno標準fetch使用。
 - 削除依存: Notion API（`api.notion.com`）への参照を全除去する。
-- スコープ: `https://www.googleapis.com/auth/calendar.events` のみ。`calendarList.list` は同スコープで取得可能のため拡大しない。
+- スコープ: `https://www.googleapis.com/auth/calendar.events`（作成）＋ `https://www.googleapis.com/auth/calendar.calendarlist.readonly`（一覧）。`calendarList.list` は events スコープでは403になる（2026-10-02検証で判明）ため、読み取り専用の最小スコープを追加する。フル `calendar` への拡大はしない。
 
 ## 2. モジュール分割（単一責任）
 
